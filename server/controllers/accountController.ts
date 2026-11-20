@@ -1,5 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { AccountLedger } from '../models/AccountLedger';
+import { Particular } from '../models/Particular';
+import { Customer } from '../models/Customer';
 import { escapeRegex, recalculateCustomerBalance, parseDateToTimestamp } from '../utils/ledgerUtils';
 
 export const getAccountDetails = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -10,7 +12,66 @@ export const getAccountDetails = async (req: Request, res: Response, next: NextF
       filter.customerName = { $regex: new RegExp(`^${escapeRegex(customerName.trim())}$`, 'i') };
     }
 
-    const accounts = await AccountLedger.find(filter).lean();
+    const accounts: any[] = await AccountLedger.find(filter).lean();
+
+    // Populate customer addresses from Customer model
+    const customerNames = Array.from(new Set(accounts.map((a: any) => a.customerName).filter(Boolean)));
+    const customers = await Customer.find({ name: { $in: customerNames } }, 'name address').lean();
+    const customerAddressMap = new Map<string, string>();
+    customers.forEach((c: any) => {
+      if (c.name && c.address) customerAddressMap.set(c.name.toLowerCase().trim(), c.address);
+    });
+
+    // Populate product names and bill addresses for BILL entries if missing
+    const billEntries = accounts.filter((a: any) => a.type === 'BILL' || a.particularId || a.billNo);
+    if (billEntries.length > 0) {
+      const partIds = billEntries.map((a: any) => a.particularId).filter(Boolean);
+      const billNos = billEntries.map((a: any) => a.billNo).filter(Boolean);
+      
+      const orConditions: any[] = [];
+      if (partIds.length > 0) orConditions.push({ _id: { $in: partIds } });
+      if (billNos.length > 0) orConditions.push({ billNo: { $in: billNos } });
+
+      if (orConditions.length > 0) {
+        const matchingParticulars = await Particular.find({ $or: orConditions }, 'billNo products customerAddress').lean();
+        const partMapById = new Map<string, string>();
+        const partMapByBill = new Map<string, string>();
+        const partAddrById = new Map<string, string>();
+        const partAddrByBill = new Map<string, string>();
+
+        matchingParticulars.forEach((p: any) => {
+          const prodStr = (p.products || []).map((x: any) => x.particular).filter(Boolean).join(', ');
+          if (p._id) {
+            partMapById.set(String(p._id), prodStr);
+            if (p.customerAddress) partAddrById.set(String(p._id), p.customerAddress);
+          }
+          if (p.billNo) {
+            partMapByBill.set(String(p.billNo).trim(), prodStr);
+            if (p.customerAddress) partAddrByBill.set(String(p.billNo).trim(), p.customerAddress);
+          }
+        });
+
+        accounts.forEach((a: any) => {
+          if (!a.productName || a.productName === '-' || a.productName === 'General') {
+            const pFromId = a.particularId ? partMapById.get(String(a.particularId)) : '';
+            const pFromBill = a.billNo ? partMapByBill.get(String(a.billNo).trim()) : '';
+            const prods = pFromId || pFromBill;
+            if (prods) {
+              a.productName = prods;
+              a.companyName = prods;
+            }
+          }
+          const addrFromPart = (a.particularId ? partAddrById.get(String(a.particularId)) : '') || (a.billNo ? partAddrByBill.get(String(a.billNo).trim()) : '');
+          const addrFromCust = a.customerName ? customerAddressMap.get(a.customerName.toLowerCase().trim()) : '';
+          a.address = a.address || addrFromPart || addrFromCust || '';
+        });
+      }
+    } else {
+      accounts.forEach((a: any) => {
+        const addrFromCust = a.customerName ? customerAddressMap.get(a.customerName.toLowerCase().trim()) : '';
+        a.address = a.address || addrFromCust || '';
+      });
+    }
 
     // Sort date-wise descending (today's / newest date first, previous dates below)
     accounts.sort((a: any, b: any) => {

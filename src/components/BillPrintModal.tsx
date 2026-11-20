@@ -24,17 +24,71 @@ interface BillPrintModalProps {
 
 export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, bill }) => {
   const [sharing, setSharing] = useState(false);
+  const [customTrader, setCustomTrader] = useState(() => {
+    const storedName = localStorage.getItem('dheeksha_trader_name');
+    const storedAddr = localStorage.getItem('dheeksha_trader_address');
+    const storedGst = localStorage.getItem('dheeksha_trader_gst');
+    return {
+      traderName: storedName && storedName !== 'BUSSY BEE TRADERS' ? storedName : '',
+      traderAddress: storedAddr && storedAddr !== 'Main Road, Sivakasi - 626123, Tamil Nadu' ? storedAddr : '',
+      traderGst: storedGst && storedGst !== 'GSTIN: 33AAAAA0000A1Z5 | State: Tamil Nadu (33)' ? storedGst : '',
+    };
+  });
+
+  React.useEffect(() => {
+    if (bill) {
+      const storedName = localStorage.getItem('dheeksha_trader_name');
+      const storedAddr = localStorage.getItem('dheeksha_trader_address');
+      const storedGst = localStorage.getItem('dheeksha_trader_gst');
+      setCustomTrader({
+        traderName: bill.traderName && bill.traderName !== 'BUSSY BEE TRADERS' ? bill.traderName : (storedName && storedName !== 'BUSSY BEE TRADERS' ? storedName : ''),
+        traderAddress: bill.traderAddress && bill.traderAddress !== 'Main Road, Sivakasi - 626123, Tamil Nadu' ? bill.traderAddress : (storedAddr && storedAddr !== 'Main Road, Sivakasi - 626123, Tamil Nadu' ? storedAddr : ''),
+        traderGst: bill.traderGst && bill.traderGst !== 'GSTIN: 33AAAAA0000A1Z5 | State: Tamil Nadu (33)' ? bill.traderGst : (storedGst && storedGst !== 'GSTIN: 33AAAAA0000A1Z5 | State: Tamil Nadu (33)' ? storedGst : ''),
+      });
+    }
+  }, [bill]);
 
   if (!bill) return null;
 
+  const currentBillWithTrader: BillPrintData = {
+    ...bill,
+    traderName: customTrader.traderName,
+    traderAddress: customTrader.traderAddress,
+    traderGst: customTrader.traderGst,
+  };
+
   const handleTriggerPrint = () => {
-    printBillDirectly(bill);
+    const name = (customTrader.traderName || '').trim();
+    const address = (customTrader.traderAddress || '').trim();
+
+    if (!name && !address) {
+      alert('Name and Address are mandatory! Please fill in Name and Address before printing.');
+      return;
+    }
+    if (!name) {
+      alert('Name is mandatory! Please enter Name before printing.');
+      return;
+    }
+    if (!address) {
+      alert('Address is mandatory! Please enter Address before printing.');
+      return;
+    }
+
+    printBillDirectly(currentBillWithTrader);
   };
 
   const handleShareWhatsApp = async () => {
+    const name = (customTrader.traderName || '').trim();
+    const address = (customTrader.traderAddress || '').trim();
+
+    if (!name || !address) {
+      alert('Name and Address are mandatory! Please fill in Name and Address before sharing.');
+      return;
+    }
+
     try {
       setSharing(true);
-      await shareBillOnWhatsApp(bill);
+      await shareBillOnWhatsApp(currentBillWithTrader);
     } catch (err) {
       console.error('Failed to share bill on WhatsApp:', err);
     } finally {
@@ -188,7 +242,7 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
               maxWidth: '750px',
             }}
           >
-            <BillPrintTemplate bill={bill} />
+            <BillPrintTemplate bill={currentBillWithTrader} onUpdateTraderInfo={setCustomTrader} />
           </Box>
         </DialogContent>
 

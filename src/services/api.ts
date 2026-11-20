@@ -145,7 +145,7 @@ export const AccountsApi = {
 
 // Auth API
 export const AuthApi = {
-  login: (credentials: { username: string; password: string }) =>
+  login: (credentials: { username: string; password: string; role?: string }) =>
     request<{ token: string; user: { username: string; role: string } }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),

@@ -525,7 +525,7 @@ export const ProductsPage: FC = () => {
             autoFocus
             fullWidth
             size="small"
-            placeholder="e.g. 2 1/2 KURUVI"
+            placeholder="e.g. 5*4*2 Size Boxes"
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
             slotProps={{

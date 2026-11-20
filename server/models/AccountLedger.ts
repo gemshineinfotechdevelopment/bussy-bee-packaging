@@ -8,6 +8,8 @@ export interface IAccountLedger extends Document {
   customerName: string;
   date: string;
   companyName?: string;
+  productName?: string;
+  address?: string;
   debit: string;
   credit: string;
   balance: string;
@@ -28,6 +30,8 @@ const AccountLedgerSchema: Schema = new Schema(
     customerName: { type: String, required: true, trim: true },
     date: { type: String, required: true },
     companyName: { type: String, default: '', trim: true },
+    productName: { type: String, default: '', trim: true },
+    address: { type: String, default: '', trim: true },
     debit: { type: String, default: '0.00' },
     credit: { type: String, default: '0.00' },
     balance: { type: String, default: '0.00' },

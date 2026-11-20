@@ -1,13 +1,15 @@
 import { useState, type FC, type MouseEvent } from 'react';
-import { Box, Typography, Menu, MenuItem, ListItemIcon, Divider } from '@mui/material';
+import { Box, Typography, Menu, MenuItem, ListItemIcon, Divider, Chip } from '@mui/material';
 import PersonOutlineRoundedIcon from '@mui/icons-material/PersonOutlineRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
+import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRounded';
 
-export type NavTab = 'Customers' | 'Company' | 'Product' | 'Particulars' | 'All Customers';
+export type NavTab = 'Customers' | 'Product' | 'Particulars' | 'All Customers' | 'Company';
 
 interface NavbarProps {
   activeTab?: NavTab;
+  currentUser?: { username: string; role: string } | null;
   onSelectTab?: (tab: NavTab) => void;
   onNavigateCustomers?: () => void;
   onLogout?: () => void;
@@ -15,11 +17,18 @@ interface NavbarProps {
 
 export const Navbar: FC<NavbarProps> = ({
   activeTab = 'Customers',
+  currentUser,
   onSelectTab,
   onNavigateCustomers,
   onLogout,
 }) => {
-  const tabs: NavTab[] = ['Customers', 'Company', 'Product', 'Particulars', 'All Customers'];
+  const isSuperAdmin = currentUser?.role === 'superadmin';
+
+  // Company is removed from navbar
+  // 'All Customers' is only visible to Super Admin; Admin cannot view it
+  const tabs: NavTab[] = isSuperAdmin
+    ? ['Customers', 'Product', 'Particulars', 'All Customers']
+    : ['Customers', 'Product', 'Particulars'];
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
   const handleTabClick = (tab: NavTab) => {
@@ -184,26 +193,55 @@ export const Navbar: FC<NavbarProps> = ({
 
       {/* Right Action Icons (Profile / Logout) */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        {/* Role Pill Badge */}
+        <Chip
+          size="small"
+          icon={
+            isSuperAdmin ? (
+              <WorkspacePremiumRoundedIcon sx={{ fontSize: '15px !important', color: '#7C3AED !important' }} />
+            ) : (
+              <AdminPanelSettingsRoundedIcon sx={{ fontSize: '15px !important', color: '#0B4DB7 !important' }} />
+            )
+          }
+          label={isSuperAdmin ? 'Super Admin' : 'Admin'}
+          sx={{
+            height: '26px',
+            fontSize: '11.5px',
+            fontWeight: 700,
+            color: isSuperAdmin ? '#6D28D9' : '#0B4DB7',
+            backgroundColor: isSuperAdmin ? '#F5F3FF' : '#EEF2FF',
+            border: `1px solid ${isSuperAdmin ? '#DDD6FE' : '#BFDBFE'}`,
+            letterSpacing: '0.02em',
+            display: { xs: 'none', sm: 'inline-flex' },
+          }}
+        />
+
         <Box
           onClick={handleProfileClick}
           sx={{
             width: 34,
             height: 34,
             borderRadius: '50%',
-            backgroundColor: '#0B4DB7',
+            backgroundColor: isSuperAdmin ? '#7C3AED' : '#0B4DB7',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
-            boxShadow: '0 1px 3px rgba(11, 77, 183, 0.25)',
+            boxShadow: isSuperAdmin
+              ? '0 1px 3px rgba(124, 58, 237, 0.3)'
+              : '0 1px 3px rgba(11, 77, 183, 0.25)',
             '&:hover': {
-              backgroundColor: '#083B8D',
+              backgroundColor: isSuperAdmin ? '#6D28D9' : '#083B8D',
               transform: 'scale(1.05)',
             },
           }}
         >
-          <PersonOutlineRoundedIcon sx={{ fontSize: 20, color: '#FFFFFF' }} />
+          {isSuperAdmin ? (
+            <WorkspacePremiumRoundedIcon sx={{ fontSize: 19, color: '#FFFFFF' }} />
+          ) : (
+            <PersonOutlineRoundedIcon sx={{ fontSize: 20, color: '#FFFFFF' }} />
+          )}
         </Box>
 
         {/* Profile / Logout Menu */}
@@ -217,7 +255,7 @@ export const Navbar: FC<NavbarProps> = ({
             paper: {
               sx: {
                 borderRadius: '10px',
-                minWidth: '160px',
+                minWidth: '180px',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
                 border: '1px solid #E2E8F0',
                 mt: 1,
@@ -227,14 +265,18 @@ export const Navbar: FC<NavbarProps> = ({
         >
           <MenuItem disabled sx={{ opacity: '1 !important', py: 1 }}>
             <ListItemIcon>
-              <AdminPanelSettingsRoundedIcon sx={{ fontSize: 18, color: '#0B4DB7' }} />
+              {isSuperAdmin ? (
+                <WorkspacePremiumRoundedIcon sx={{ fontSize: 19, color: '#7C3AED' }} />
+              ) : (
+                <AdminPanelSettingsRoundedIcon sx={{ fontSize: 18, color: '#0B4DB7' }} />
+              )}
             </ListItemIcon>
             <Box>
               <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
-                Administrator
+                {isSuperAdmin ? 'Super Administrator' : 'Administrator'}
               </Typography>
               <Typography sx={{ fontSize: '11px', color: '#64748B' }}>
-                Logged In
+                {currentUser?.username || (isSuperAdmin ? 'superadmin' : 'admin')}
               </Typography>
             </Box>
           </MenuItem>

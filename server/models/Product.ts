@@ -4,6 +4,7 @@ export interface IProduct extends Document {
   slNo: number;
   name: string;
   code?: string;
+  hsn?: string;
   category?: string;
   rate?: number;
   pktUnit?: string;
@@ -16,6 +17,7 @@ const ProductSchema: Schema = new Schema(
     slNo: { type: Number, required: true },
     name: { type: String, required: true, trim: true },
     code: { type: String, trim: true, default: '' },
+    hsn: { type: String, trim: true, default: '' },
     category: { type: String, trim: true, default: '' },
     rate: { type: Number, default: 0 },
     pktUnit: { type: String, trim: true, default: '1' },

@@ -67,6 +67,7 @@ export const createParticular = async (req: Request, res: Response, next: NextFu
   try {
     const {
       customerName,
+      customerAddress,
       caseCount,
       companyName,
       discount,
@@ -98,6 +99,7 @@ export const createParticular = async (req: Request, res: Response, next: NextFu
 
     const particular = await Particular.create({
       customerName: customerName || 'General',
+      customerAddress: customerAddress ? String(customerAddress).trim() : '',
       caseCount: caseCount || '0',
       companyName: companyName ? String(companyName).trim() : '',
       discount: discount || '0',
@@ -114,12 +116,15 @@ export const createParticular = async (req: Request, res: Response, next: NextFu
     // Automatically log to Account Ledger using Net Total
     const billTotalNum = getParticularNetTotal(particular);
     if (billTotalNum > 0) {
+      const prodNames = (particular.products || []).map((p: any) => p.particular).filter(Boolean).join(', ');
       await AccountLedger.create({
         particularId: String(particular._id),
         billNo: particular.billNo,
         customerName: particular.customerName,
         date: particular.date,
-        companyName: particular.companyName,
+        companyName: prodNames || particular.companyName || '-',
+        productName: prodNames || '-',
+        address: particular.customerAddress || '',
         debit: billTotalNum.toFixed(2),
         credit: '0.00',
         balance: '0.00',
@@ -151,6 +156,7 @@ export const updateParticular = async (req: Request, res: Response, next: NextFu
 
     const {
       customerName,
+      customerAddress,
       caseCount,
       companyName,
       discount,
@@ -168,6 +174,7 @@ export const updateParticular = async (req: Request, res: Response, next: NextFu
       id,
       {
         ...(customerName !== undefined && { customerName }),
+        ...(customerAddress !== undefined && { customerAddress }),
         ...(caseCount !== undefined && { caseCount }),
         ...(companyName !== undefined && { companyName }),
         ...(discount !== undefined && { discount }),
@@ -200,9 +207,13 @@ export const updateParticular = async (req: Request, res: Response, next: NextFu
       ],
     });
 
+    const prodNames = (updatedParticular.products || []).map((p: any) => p.particular).filter(Boolean).join(', ');
+
     if (ledgerEntry) {
       ledgerEntry.customerName = updatedParticular.customerName;
-      ledgerEntry.companyName = updatedParticular.companyName;
+      ledgerEntry.companyName = prodNames || updatedParticular.companyName || '-';
+      ledgerEntry.productName = prodNames || '-';
+      if (updatedParticular.customerAddress) ledgerEntry.address = updatedParticular.customerAddress;
       ledgerEntry.date = updatedParticular.date;
       ledgerEntry.billNo = updatedParticular.billNo;
       ledgerEntry.debit = billTotalNum.toFixed(2);
@@ -213,7 +224,9 @@ export const updateParticular = async (req: Request, res: Response, next: NextFu
         billNo: updatedParticular.billNo,
         customerName: updatedParticular.customerName,
         date: updatedParticular.date,
-        companyName: updatedParticular.companyName,
+        companyName: prodNames || updatedParticular.companyName || '-',
+        productName: prodNames || '-',
+        address: updatedParticular.customerAddress || '',
         debit: billTotalNum.toFixed(2),
         credit: '0.00',
         balance: '0.00',

@@ -25,7 +25,14 @@ export const getProductById = async (req: Request, res: Response, next: NextFunc
 
 export const createProduct = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const product = await Product.create(req.body);
+    const data = { ...req.body };
+    if (!data.slNo) {
+      const highest = await Product.findOne().sort({ slNo: -1 }).select('slNo');
+      data.slNo = (highest?.slNo || 0) + 1;
+    }
+    if (data.hsn && !data.code) data.code = data.hsn;
+    if (data.code && !data.hsn) data.hsn = data.code;
+    const product = await Product.create(data);
     res.status(201).json({ success: true, data: product });
   } catch (error) {
     next(error);

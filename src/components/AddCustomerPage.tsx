@@ -276,7 +276,7 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
                   letterSpacing: '-0.01em',
                 }}
               >
-                Billing / Delivery Address *
+                Delivery Address *
               </Typography>
               <Box
                 sx={{

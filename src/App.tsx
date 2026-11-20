@@ -16,15 +16,28 @@ function App() {
     return Boolean(localStorage.getItem('dheeksha_auth_token'));
   });
 
+  const [currentUser, setCurrentUser] = useState<{ username: string; role: string } | null>(() => {
+    try {
+      const raw = localStorage.getItem('dheeksha_auth_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [activeTab, setActiveTab] = useState<NavTab>(() => {
     const saved = localStorage.getItem('dheeksha_active_tab') as NavTab;
-    const validTabs: NavTab[] = [
-      'Particulars',
-      'Product',
-      'Company',
-      'All Customers',
-      'Customers',
-    ];
+    let savedUser: { username: string; role: string } | null = null;
+    try {
+      const raw = localStorage.getItem('dheeksha_auth_user');
+      if (raw) savedUser = JSON.parse(raw);
+    } catch {}
+
+    const isSuperAdmin = savedUser?.role === 'superadmin';
+    const validTabs: NavTab[] = isSuperAdmin
+      ? ['Particulars', 'Product', 'All Customers', 'Customers']
+      : ['Particulars', 'Product', 'Customers'];
+
     return validTabs.includes(saved) ? saved : 'Customers';
   });
 
@@ -44,8 +57,14 @@ function App() {
     return (localStorage.getItem('dheeksha_particular_subtab') as ParticularSubTab) || 'Select Customer';
   });
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = (user: { username: string; role: string }) => {
+    setCurrentUser(user);
     setIsAuthenticated(true);
+    // Standard admin should never be on 'All Customers' or 'Company'
+    if (user.role !== 'superadmin' && (activeTab === 'All Customers' || activeTab === 'Company')) {
+      setActiveTab('Customers');
+      localStorage.setItem('dheeksha_active_tab', 'Customers');
+    }
   };
 
   const handleLogout = () => {
@@ -56,10 +75,21 @@ function App() {
     localStorage.removeItem('dheeksha_customer_subview');
     localStorage.removeItem('dheeksha_particular_subtab');
     localStorage.removeItem('dheeksha_active_customer');
+    setCurrentUser(null);
     setIsAuthenticated(false);
   };
 
   const handleSelectTab = (tab: NavTab) => {
+    // Company is disabled in navbar
+    if (tab === 'Company') return;
+
+    // Only Super Admin can access 'All Customers'
+    if (tab === 'All Customers' && currentUser?.role !== 'superadmin') {
+      setActiveTab('Customers');
+      localStorage.setItem('dheeksha_active_tab', 'Customers');
+      return;
+    }
+
     setActiveTab(tab);
     localStorage.setItem('dheeksha_active_tab', tab);
     if (tab === 'Particulars') {
@@ -67,10 +97,6 @@ function App() {
       localStorage.removeItem('dheeksha_active_customer');
       setParticularInitialSubTab('Select Customer');
       localStorage.setItem('dheeksha_particular_subtab', 'Select Customer');
-    }
-    if (tab === 'Company') {
-      setCompanySubView('list');
-      localStorage.setItem('dheeksha_company_subview', 'list');
     }
     if (tab === 'Customers') {
       setCustomerSubView('list');
@@ -121,6 +147,7 @@ function App() {
       >
         <Navbar
           activeTab={activeTab}
+          currentUser={currentUser}
           onSelectTab={handleSelectTab}
           onNavigateCustomers={() => {
             handleSelectTab('Customers');
@@ -133,6 +160,7 @@ function App() {
           {/* Particulars Tab */}
           {activeTab === 'Particulars' && (
             <ParticularsPage
+              currentUser={currentUser}
               initialCustomerName={selectedCustomerName}
               initialSubTab={particularInitialSubTab}
             />
@@ -141,7 +169,7 @@ function App() {
           {/* Product Tab */}
           {activeTab === 'Product' && <ProductsPage />}
 
-          {/* Company Tab */}
+          {/* Company Tab (Kept for direct programmatic view if needed, but omitted from Navbar) */}
           {activeTab === 'Company' && (
             <>
               {companySubView === 'add' ? (
@@ -156,8 +184,8 @@ function App() {
             </>
           )}
 
-          {/* All Customers Tab */}
-          {activeTab === 'All Customers' && (
+          {/* All Customers Tab - ONLY accessible to Super Admin */}
+          {activeTab === 'All Customers' && currentUser?.role === 'superadmin' && (
             <AllCustomersPage
               onAddNewCustomer={() => {
                 handleSelectTab('Customers');
@@ -182,6 +210,13 @@ function App() {
                 />
               )}
             </>
+          )}
+
+          {/* Fallback for unauthorized or invalid tabs */}
+          {activeTab === 'All Customers' && currentUser?.role !== 'superadmin' && (
+            <Box sx={{ p: 4, textAlign: 'center', color: '#DC2626' }}>
+              Access restricted. Only Super Admin can view All Customers.
+            </Box>
           )}
 
           {/* Other Tabs */}

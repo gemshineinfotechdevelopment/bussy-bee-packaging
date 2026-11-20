@@ -62,37 +62,118 @@ export type ParticularSubTab =
   | 'Particular Details'
   | 'Add Credit';
 
-const SUB_TABS: ParticularSubTab[] = [
-  'Select Customer',
-  'Create Particular',
-  'Account Details',
-  'Particular Details',
-  'Add Credit',
-];
-
 interface ProductRowItem {
   id: string;
   particular: string;
+  hsn?: string;
   quantity: string;
   rate: string;
   pktUnit: string;
   amount: string;
 }
 
+export const formatCityAndPincode = (rawAddress?: string): string => {
+  if (!rawAddress || !rawAddress.trim()) return '-';
+  const clean = rawAddress.trim();
+
+  // Find 6-digit Indian pincode
+  const pinMatch = clean.match(/\b\d{6}\b/);
+  const pincode = pinMatch ? pinMatch[0] : '';
+
+  // Split by comma, semicolon, newline
+  const parts = clean
+    .split(/[,;\n]+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const nonCityKeywords = [
+    'tamil nadu',
+    'tamilnadu',
+    'tn',
+    'india',
+    'kerala',
+    'karnataka',
+    'andhra pradesh',
+    'telangana',
+    'maharashtra',
+  ];
+
+  const cityCandidates = parts.filter((part) => {
+    const lower = part.toLowerCase();
+    if (/^\d+$/.test(part.replace(/\s+/g, ''))) return false;
+    if (nonCityKeywords.includes(lower)) return false;
+    return true;
+  });
+
+  let city = '';
+  if (cityCandidates.length > 0) {
+    const last = cityCandidates[cityCandidates.length - 1];
+    const stripped = last.replace(/\b\d{6}\b/, '').replace(/[-–—]/g, '').trim();
+    if (stripped && !nonCityKeywords.includes(stripped.toLowerCase())) {
+      city = stripped;
+    } else if (cityCandidates.length > 1) {
+      city = cityCandidates[cityCandidates.length - 2].replace(/\b\d{6}\b/, '').replace(/[-–—]/g, '').trim();
+    } else {
+      city = stripped;
+    }
+  }
+
+  if (city && pincode) {
+    return `${city}, ${pincode}`;
+  }
+  if (city) return city;
+  if (pincode) return pincode;
+  return clean;
+};
+
 interface ParticularsPageProps {
+  currentUser?: { username: string; role: string } | null;
   initialCustomerName?: string;
   initialSubTab?: ParticularSubTab;
 }
 
-export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName, initialSubTab }) => {
+export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initialCustomerName, initialSubTab }) => {
+  // Determine if logged-in user is Super Admin
+  const userRole =
+    currentUser?.role ||
+    (() => {
+      try {
+        const u = localStorage.getItem('dheeksha_auth_user');
+        return u ? JSON.parse(u)?.role : 'admin';
+      } catch {
+        return 'admin';
+      }
+    })();
+  const isSuperAdmin = userRole === 'superadmin';
+
+  // Subtabs list: 'Add Credit' is ONLY visible to Super Admin
+  const subTabs: ParticularSubTab[] = useMemo(() => {
+    return isSuperAdmin
+      ? ['Select Customer', 'Create Particular', 'Account Details', 'Particular Details', 'Add Credit']
+      : ['Select Customer', 'Create Particular', 'Account Details', 'Particular Details'];
+  }, [isSuperAdmin]);
+
   const [activeSubTab, setActiveSubTab] = useState<ParticularSubTab>(() => {
-    return initialSubTab || (localStorage.getItem('dheeksha_particular_subtab') as ParticularSubTab) || 'Select Customer';
+    const saved = (localStorage.getItem('dheeksha_particular_subtab') as ParticularSubTab) || 'Select Customer';
+    const target = initialSubTab || saved;
+    if (!isSuperAdmin && target === 'Add Credit') {
+      return 'Select Customer';
+    }
+    return target;
   });
 
+  // Ensure Admin cannot stay on 'Add Credit'
+  useEffect(() => {
+    if (!isSuperAdmin && activeSubTab === 'Add Credit') {
+      setActiveSubTab('Select Customer');
+      localStorage.setItem('dheeksha_particular_subtab', 'Select Customer');
+    }
+  }, [isSuperAdmin, activeSubTab]);
+
   // Live Dropdown options
-  const [customerOptions, setCustomerOptions] = useState<{ id: string; name: string }[]>([]);
+  const [customerOptions, setCustomerOptions] = useState<{ id: string; name: string; address?: string; gst?: string; mobile?: string }[]>([]);
   const [companyOptions, setCompanyOptions] = useState<{ id: string; name: string }[]>([]);
-  const [productOptions, setProductOptions] = useState<{ id: string; name: string }[]>([]);
+  const [productOptions, setProductOptions] = useState<{ id: string; name: string; code?: string; rate?: number; pktUnit?: string }[]>([]);
 
   // Persistent Selected Customer for Creation & Filter
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
@@ -121,9 +202,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
   // Subtab 2: Create Particular Form State
   const [caseCount, setCaseCount] = useState<string>('0');
   const [company, setCompany] = useState<string>('');
+  const [customerAddress, setCustomerAddress] = useState<string>('');
   const [discount, setDiscount] = useState<string>('');
-  const [transport, setTransport] = useState<string>('');
-  const [packing, setPacking] = useState<string>('');
   const [billNo, setBillNo] = useState<string>('');
   const [tax, setTax] = useState<string>('');
   const [date, setDate] = useState<string>(() => {
@@ -133,6 +213,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
 
   // Product Entry Form State
   const [selectedProduct, setSelectedProduct] = useState<string>('');
+  const [hsnCode, setHsnCode] = useState<string>('');
   const [quantity, setQuantity] = useState<string>('');
   const [rate, setRate] = useState<string>('');
   const [pkt, setPkt] = useState<string>('');
@@ -140,10 +221,11 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editRowData, setEditRowData] = useState<{
     particular: string;
+    hsn: string;
     quantity: string;
     rate: string;
     pktUnit: string;
-  }>({ particular: '', quantity: '', rate: '', pktUnit: '' });
+  }>({ particular: '', hsn: '', quantity: '', rate: '', pktUnit: '' });
   const [createLoading, setCreateLoading] = useState(false);
 
   // Subtab 3: Account Details State
@@ -156,7 +238,6 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
 
   // Subtab 5: Add Credit Form State
   const [addCreditCustomerName, setAddCreditCustomerName] = useState<string>('');
-  const [addCreditCompanyName, setAddCreditCompanyName] = useState<string>('');
   const [creditAmount, setCreditAmount] = useState<string>('');
   const [creditNotes, setCreditNotes] = useState<string>('Additional customer advance');
   const [creditDate, setCreditDate] = useState<string>(() => {
@@ -210,6 +291,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadTargetBillId, setUploadTargetBillId] = useState<string | null>(null);
   const [uploadingBillId, setUploadingBillId] = useState<string | null>(null);
+  void uploadingBillId;
   const [pdfPreviewModal, setPdfPreviewModal] = useState<{
     open: boolean;
     url: string;
@@ -246,12 +328,16 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
       const match = customerOptions.find((c) => c.name === initialCustomerName);
       if (match) {
         setSelectedCustomerId(match.id);
+        if (match.address) {
+          setCustomerAddress(match.address);
+        }
       }
     } else {
       setCurrentCustomerName('');
       setFilterCustomer('');
       setAddCreditCustomerName('');
       setSelectedCustomerId('');
+      setCustomerAddress('');
     }
   }, [initialCustomerName, customerOptions]);
 
@@ -281,7 +367,13 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
         ]);
 
         if (custRes && custRes.length > 0) {
-          const mapped = custRes.map((c: any) => ({ id: c._id || c.id, name: c.name }));
+          const mapped = custRes.map((c: any) => ({
+            id: c._id || c.id,
+            name: c.name,
+            address: c.address,
+            gst: c.gst,
+            mobile: c.mobile,
+          }));
           setCustomerOptions(mapped);
 
           if (currentCustomerName) {
@@ -290,6 +382,9 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
               setSelectedCustomerId(existing.id);
               setAddCreditCustomerName(existing.name);
               setFilterCustomer(existing.name);
+              if (existing.address) {
+                setCustomerAddress(existing.address);
+              }
             }
           }
         }
@@ -300,7 +395,13 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
         }
 
         if (prodRes && prodRes.length > 0) {
-          const mapped = prodRes.map((p: any) => ({ id: p._id || p.id, name: p.name }));
+          const mapped = prodRes.map((p: any) => ({
+            id: p._id || p.id,
+            name: p.name,
+            code: p.code || p.hsn || '',
+            rate: p.rate,
+            pktUnit: p.pktUnit,
+          }));
           setProductOptions(mapped);
         }
       } catch (err) {
@@ -412,7 +513,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
   // Subtab 2: Product Line Addition
   const handleAddProductRow = () => {
     if (!selectedProduct || !quantity || !rate) {
-      alert('Please select Product, enter Case and Rate');
+      alert('Please select Product, enter No. of Counts and Rate');
       return;
     }
     const caseVal = parseFloat(quantity) || 0;
@@ -422,7 +523,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
 
     const newRow: ProductRowItem = {
       id: Date.now().toString(),
-      particular: selectedProduct,
+      particular: selectedProduct.trim(),
+      hsn: hsnCode.trim(),
       quantity,
       rate,
       pktUnit: pkt ? pkt : '-',
@@ -430,6 +532,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
     };
     setProductRows((prev) => [...prev, newRow]);
     setSelectedProduct('');
+    setHsnCode('');
     setQuantity('');
     setRate('');
     setPkt('');
@@ -440,6 +543,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
     setEditingRowId(row.id);
     setEditRowData({
       particular: row.particular,
+      hsn: row.hsn || '',
       quantity: row.quantity,
       rate: row.rate,
       pktUnit: row.pktUnit === '-' ? '' : row.pktUnit,
@@ -449,7 +553,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
   // Save edited product row
   const handleSaveEditRow = (id: string) => {
     if (!editRowData.particular || !editRowData.quantity || !editRowData.rate) {
-      alert('Please enter Product, Cases, and Rate');
+      alert('Please enter Product, No. of Counts, and Rate');
       return;
     }
     const caseVal = parseFloat(editRowData.quantity) || 0;
@@ -463,6 +567,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
           ? {
               ...row,
               particular: editRowData.particular.trim(),
+              hsn: editRowData.hsn.trim(),
               quantity: editRowData.quantity.trim(),
               rate: editRowData.rate.trim(),
               pktUnit: editRowData.pktUnit.trim() !== '' ? editRowData.pktUnit.trim() : '-',
@@ -496,19 +601,6 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
     return num;
   }, [discount, subtotalAmount]);
 
-  // Packing Calculation (Calculated from reduced amount after discount)
-  const packingVal = useMemo(() => {
-    if (!packing) return 0;
-    const cleanPack = String(packing).trim();
-    const num = parseFloat(cleanPack) || 0;
-    if (num <= 0) return 0;
-    const baseAfterDiscount = Math.max(0, subtotalAmount - discountVal);
-    if (cleanPack.endsWith('%') || num <= 100) {
-      return (baseAfterDiscount * num) / 100;
-    }
-    return num;
-  }, [packing, subtotalAmount, discountVal]);
-
   // Tax Calculation (Manual fixed amount directly added)
   const taxVal = useMemo(() => {
     if (!tax) return 0;
@@ -518,11 +610,11 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
     return num;
   }, [tax]);
 
-  // Final Net Total Amount
+  // Final Net Total Amount (Packing & Transport removed)
   const finalTotalAmount = useMemo(() => {
-    const net = Math.max(0, subtotalAmount - discountVal + packingVal + taxVal);
+    const net = Math.max(0, subtotalAmount - discountVal + taxVal);
     return net.toFixed(2);
-  }, [subtotalAmount, discountVal, packingVal, taxVal]);
+  }, [subtotalAmount, discountVal, taxVal]);
 
   // Subtab 2: Submit Particular Bill
   const handleCreateParticular = async () => {
@@ -541,35 +633,89 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
 
     try {
       setCreateLoading(true);
+
+      // Auto-add any new product items directly to Products collection in database
+      for (const row of productRows) {
+        const prodName = row.particular.trim();
+        const exists = productOptions.some(
+          (opt) => opt.name.trim().toLowerCase() === prodName.toLowerCase()
+        );
+        if (!exists && prodName) {
+          try {
+            await ProductsApi.create({
+              name: prodName,
+              code: row.hsn ? row.hsn.trim() : '',
+              hsn: row.hsn ? row.hsn.trim() : '',
+              rate: parseFloat(row.rate) || 0,
+              pktUnit: row.pktUnit && row.pktUnit !== '-' ? row.pktUnit : '1',
+            });
+            console.log(`[Product] Auto-created product in database: ${prodName}`);
+          } catch (pErr) {
+            console.warn(`[Product] Auto-add failed for ${prodName}:`, pErr);
+          }
+        }
+      }
+
+      // Refresh productOptions immediately
+      try {
+        const freshProducts = await ProductsApi.getAll();
+        if (freshProducts && freshProducts.length > 0) {
+          setProductOptions(
+            freshProducts.map((p: any) => ({
+              id: p._id || p.id,
+              name: p.name,
+              code: p.code || p.hsn || '',
+              rate: p.rate,
+              pktUnit: p.pktUnit,
+            }))
+          );
+        }
+      } catch {}
+
+      const targetCustomer = customerOptions.find((c) => c.name.toLowerCase() === (currentCustomerName || '').toLowerCase());
+      const resolvedAddress = customerAddress.trim() || targetCustomer?.address || '';
+
       const created = await ParticularsApi.create({
         customerName: currentCustomerName || 'General',
+        customerAddress: resolvedAddress,
         caseCount: caseCount || '0',
-        companyName: company ? company.trim() : '',
+        companyName: '',
         discount: discount || '0',
-        transport: transport || '-',
-        packing: packing || '0',
+        transport: '-',
+        packing: '0',
         billNo: billNo.trim(),
         tax: tax || '0',
         amount: subtotalAmount.toFixed(2),
         total: finalTotalAmount,
         date: date,
-        products: productRows,
+        products: productRows.map((p) => ({
+          particular: p.particular,
+          hsn: p.hsn || '',
+          quantity: p.quantity,
+          rate: p.rate,
+          pktUnit: p.pktUnit,
+          amount: p.amount,
+        })),
       });
 
       const assignedBillNo = created?.billNo || billNo.trim();
       const createdBillData: BillPrintData = {
         billNo: assignedBillNo,
         customerName: currentCustomerName || 'General',
-        companyName: company ? company.trim() : '',
+        customerAddress: resolvedAddress,
+        customerGst: targetCustomer?.gst || '',
+        customerMobile: targetCustomer?.mobile || '+91 98765 43210',
+        companyName: '',
         preparedBy: 'S.Nagaraj',
-        phone: '+91 98765 43210',
+        phone: targetCustomer?.mobile || '+91 98765 43210',
         email: 'info@bussybee.com',
         website: 'www.bussybee.com',
-        transport: transport && transport.trim() !== '' && transport !== '-' ? transport.trim() : '-',
+        transport: '-',
         caseCount: caseCount || '0',
         date: date,
         products: productRows.map((p) => ({
           particular: p.particular,
+          hsn: p.hsn,
           quantity: p.quantity,
           rate: p.rate,
           pktUnit: p.pktUnit,
@@ -577,22 +723,21 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
         })),
         amount: subtotalAmount.toFixed(2),
         discount: discount || '0',
-        packing: packing || '0',
+        packing: '0',
         tax: tax || '0',
         total: finalTotalAmount,
       };
 
-      const successMsg = `Particular bill #${assignedBillNo}${company && company.trim() ? ` for ${company.trim()}` : ''} created successfully!`;
+      const successMsg = `Particular bill #${assignedBillNo} created successfully!`;
       alert(successMsg);
 
       setBillNo('');
       setCompany('');
       setSelectedProduct('');
+      setHsnCode('');
       setProductRows([]);
       setCaseCount('0');
       setDiscount('');
-      setTransport('');
-      setPacking('');
       setTax('');
       fetchAccounts(filterCustomer);
       fetchParticulars();
@@ -622,7 +767,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
       setCreditLoading(true);
       const res = await AccountsApi.addCredit({
         customerName: targetCust,
-        companyName: addCreditCompanyName ? addCreditCompanyName.trim() : '',
+        companyName: '',
         creditAmount: creditAmount.trim(),
         date: creditDate,
         paymentMode: 'Bank',
@@ -695,19 +840,26 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
   };
 
   const handleOpenBillPrint = (billData: any, autoTrigger = false) => {
+    const targetCustomer = customerOptions.find(
+      (c) => c.name.toLowerCase() === (billData.customerName || currentCustomerName || '').toLowerCase()
+    );
     const formattedBill: BillPrintData = {
       billNo: billData.billNo || '',
       date: billData.date || '',
       customerName: billData.customerName || currentCustomerName || '',
+      customerAddress: targetCustomer?.address || billData.customerAddress || '',
+      customerGst: targetCustomer?.gst || billData.customerGst || '',
+      customerMobile: targetCustomer?.mobile || billData.customerMobile || '',
       companyName: billData.companyName || company || '',
       preparedBy: billData.preparedBy || 'S.Nagaraj',
-      phone: '+91 98765 43210',
+      phone: targetCustomer?.mobile || billData.phone || '+91 98765 43210',
       email: 'info@bussybee.com',
       website: 'www.bussybee.com',
       transport: billData.transport && billData.transport.trim() !== '' && billData.transport !== '-' ? billData.transport.trim() : '-',
       caseCount: billData.caseCount || billData.cases || (billData.products ? billData.products.reduce((acc: number, p: any) => acc + (parseFloat(p.quantity) || 0), 0) : 0),
       products: (billData.products || []).map((p: any) => ({
         particular: p.particular || p.particularName || p.name || '',
+        hsn: p.hsn || '',
         quantity: p.quantity || '',
         rate: p.rate || '',
         pktUnit: p.pktUnit || p.pkt || '',
@@ -726,7 +878,23 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
     setSelectedBillForPrint(formattedBill);
 
     if (autoTrigger) {
-      printBillDirectly(formattedBill);
+      const storedName = localStorage.getItem('dheeksha_trader_name');
+      const storedAddr = localStorage.getItem('dheeksha_trader_address');
+      const hasName = Boolean(storedName && storedName.trim() && storedName !== 'BUSSY BEE TRADERS');
+      const hasAddr = Boolean(storedAddr && storedAddr.trim() && storedAddr !== 'Main Road, Sivakasi - 626123, Tamil Nadu');
+
+      if (!hasName || !hasAddr) {
+        setPrintModalOpen(true);
+      } else {
+        const storedGst = localStorage.getItem('dheeksha_trader_gst');
+        const billWithTrader: BillPrintData = {
+          ...formattedBill,
+          traderName: storedName || '',
+          traderAddress: storedAddr || '',
+          traderGst: storedGst && storedGst !== 'GSTIN: 33AAAAA0000A1Z5 | State: Tamil Nadu (33)' ? storedGst : '',
+        };
+        printBillDirectly(billWithTrader);
+      }
     } else {
       setPrintModalOpen(true);
     }
@@ -748,6 +916,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
         date: billData.date || new Date().toISOString().split('T')[0],
         products: (billData.products || []).map((p: any) => ({
           particular: p.particular || p.particularName || p.name || 'Product',
+          hsn: p.hsn || '',
           quantity: String(p.quantity || '0'),
           rate: String(p.rate || '0'),
           pktUnit: p.pktUnit || p.pkt || '-',
@@ -1023,7 +1192,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
     }
   };
 
-  const handleOpenPdfPreview = (row: any) => {
+  const _handleOpenPdfPreview = (row: any) => {
     const rowId = row._id || row.id || '';
     if (!row.pdfData) {
       handleTriggerPdfUpload(rowId);
@@ -1038,6 +1207,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
       billNo: row.billNo,
     });
   };
+  void _handleOpenPdfPreview;
 
   const handleDeleteAttachedPdf = async (id: string) => {
     if (!window.confirm('Are you sure you want to remove the attached PDF from this bill?')) return;
@@ -1090,7 +1260,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
           pb: 0.5,
         }}
       >
-        {SUB_TABS.map((tab) => {
+        {subTabs.map((tab) => {
           const isActive = activeSubTab === tab;
           return (
             <Box
@@ -1288,18 +1458,16 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
         <Box
           sx={{
             display: 'flex',
-            flexDirection: { xs: 'column', lg: 'row' },
+            flexDirection: 'column',
             gap: 2.5,
             width: '100%',
-            alignItems: 'flex-start',
           }}
         >
-          {/* Left Card: Create Particular Form */}
+          {/* Top Card: Create Particular Form */}
           <Paper
             elevation={0}
             sx={{
-              width: { xs: '100%', lg: '360px', xl: '380px' },
-              flexShrink: 0,
+              width: '100%',
               backgroundColor: '#FFFFFF',
               borderRadius: '8px',
               border: '1px solid #E2E8F0',
@@ -1328,8 +1496,9 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
               </Typography>
             </Box>
 
-            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.6 }}>
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 1.5 }}>
+            <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {/* Row 1: Customer and Address (City, State, Pincode) */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
                     Customer
@@ -1350,8 +1519,12 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                         setSelectedCustomerId(val.id);
                         setFilterCustomer(val.name);
                         setAddCreditCustomerName(val.name);
+                        if (val.address) {
+                          setCustomerAddress(val.address);
+                        }
                       } else {
                         setSelectedCustomerId('');
+                        setCustomerAddress('');
                       }
                     }}
                     renderInput={(params) => (
@@ -1383,86 +1556,17 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                     )}
                   />
                 </Box>
-                <Box>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    Case Count
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={caseCount}
-                    onChange={(e) => setCaseCount(e.target.value)}
-                    slotProps={{
-                      input: {
-                        sx: {
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          height: '36px',
-                          backgroundColor: '#F8FAFC',
-                          borderRadius: '6px',
-                          color: '#0F172A',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#CBD5E1',
-                          },
-                        },
-                      },
-                    }}
-                  />
-                </Box>
-              </Box>
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 1.5 }}>
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    Company
-                  </Typography>
-                  <Autocomplete
-                    fullWidth
-                    size="small"
-                    autoHighlight
-                    options={companyOptions}
-                    getOptionLabel={(option) => (typeof option === 'string' ? option : option.name || '')}
-                    isOptionEqualToValue={(option, val) => option.id === val.id || option.name === val.name}
-                    value={companyOptions.find((c) => c.name === company) || null}
-                    onChange={(_, val) => setCompany(val ? val.name : '')}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        placeholder="Search Company..."
-                        sx={{
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: '6px',
-                          '& .MuiOutlinedInput-root': {
-                            height: '36px',
-                            borderRadius: '6px',
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            color: '#0F172A',
-                            '& fieldset': {
-                              borderColor: '#CBD5E1',
-                            },
-                            '&:hover fieldset': {
-                              borderColor: '#94A3B8',
-                            },
-                            '&.Mui-focused fieldset': {
-                              borderColor: '#0B4DB7',
-                              borderWidth: '1.5px',
-                            },
-                          },
-                        }}
-                      />
-                    )}
-                  />
-                </Box>
-                <Box>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    Discount (%)
+                    Address (City, State, Pincode)
                   </Typography>
                   <TextField
                     fullWidth
                     size="small"
-                    value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
+                    placeholder="City, State, Pincode"
+                    value={customerAddress}
+                    onChange={(e) => setCustomerAddress(e.target.value)}
                     slotProps={{
                       input: {
                         sx: {
@@ -1474,58 +1578,12 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                           '& .MuiOutlinedInput-notchedOutline': {
                             borderColor: '#CBD5E1',
                           },
-                        },
-                      },
-                    }}
-                  />
-                </Box>
-              </Box>
-
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 1.5 }}>
-                <Box>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    Transport
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={transport}
-                    onChange={(e) => setTransport(e.target.value)}
-                    slotProps={{
-                      input: {
-                        sx: {
-                          fontSize: '13px',
-                          fontWeight: 500,
-                          height: '36px',
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: '6px',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#CBD5E1',
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#94A3B8',
                           },
-                        },
-                      },
-                    }}
-                  />
-                </Box>
-                <Box>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    Packing (%)
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={packing}
-                    onChange={(e) => setPacking(e.target.value)}
-                    slotProps={{
-                      input: {
-                        sx: {
-                          fontSize: '13px',
-                          fontWeight: 500,
-                          height: '36px',
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: '6px',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#CBD5E1',
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#0B4DB7',
+                            borderWidth: '1.5px',
                           },
                         },
                       },
@@ -1534,7 +1592,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                 </Box>
               </Box>
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 1.5 }}>
+              {/* Row 2: Bill No, Date, Discount (%), Tax (₹) */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
                     Bill No *
@@ -1561,6 +1620,47 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                     }}
                   />
                 </Box>
+
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    Date
+                  </Typography>
+                  <DatePickerField
+                    value={date}
+                    onChange={setDate}
+                    placeholder="dd-mm-yyyy"
+                    iconSize={16}
+                    inputSx={{ height: '36px' }}
+                  />
+                </Box>
+
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    Discount (%)
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="0"
+                    value={discount}
+                    onChange={(e) => setDiscount(e.target.value)}
+                    slotProps={{
+                      input: {
+                        sx: {
+                          fontSize: '13px',
+                          fontWeight: 500,
+                          height: '36px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '6px',
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#CBD5E1',
+                          },
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
                     Tax (₹)
@@ -1589,102 +1689,93 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                 </Box>
               </Box>
 
+              {/* Row 3: Totals Bar and Click to Create Button */}
               <Box
                 sx={{
-                  backgroundColor: '#F8FAFC',
-                  p: 1.4,
-                  borderRadius: '6px',
-                  border: '1px solid #E2E8F0',
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 1.5,
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  pt: 1.5,
+                  borderTop: '1px solid #E2E8F0',
+                  gap: 2,
                 }}
               >
-                <Box>
-                  <Typography sx={{ fontSize: '11.5px', fontWeight: 600, color: '#64748B', mb: 0.5 }}>
-                    Amount
-                  </Typography>
-                  <Box
-                    sx={{
-                      backgroundColor: '#E2E8F0',
-                      borderRadius: '4px',
-                      px: 1.5,
-                      py: 0.7,
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      color: '#0F172A',
-                      textAlign: 'right',
-                    }}
-                  >
-                    {subtotalAmount.toFixed(2)}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 3 } }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
+                      Amount:
+                    </Typography>
+                    <Box
+                      sx={{
+                        backgroundColor: '#F1F5F9',
+                        borderRadius: '4px',
+                        px: 1.8,
+                        py: 0.6,
+                        fontSize: '13.5px',
+                        fontWeight: 700,
+                        color: '#0F172A',
+                        minWidth: '90px',
+                        textAlign: 'right',
+                        border: '1px solid #E2E8F0',
+                      }}
+                    >
+                      ₹{subtotalAmount.toFixed(2)}
+                    </Box>
                   </Box>
-                </Box>
-                <Box>
-                  <Typography sx={{ fontSize: '11.5px', fontWeight: 600, color: '#64748B', mb: 0.5 }}>
-                    Total
-                  </Typography>
-                  <Box
-                    sx={{
-                      backgroundColor: '#E2E8F0',
-                      borderRadius: '4px',
-                      px: 1.5,
-                      py: 0.7,
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      color: '#0B4DB7',
-                      textAlign: 'right',
-                    }}
-                  >
-                    {finalTotalAmount}
-                  </Box>
-                </Box>
-              </Box>
 
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 1.5, mt: 0.5 }}>
-                <Box>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    Date
-                  </Typography>
-                  <DatePickerField
-                    value={date}
-                    onChange={setDate}
-                    placeholder="dd-mm-yyyy"
-                    iconSize={16}
-                    inputSx={{ height: '36px' }}
-                  />
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
+                      Total:
+                    </Typography>
+                    <Box
+                      sx={{
+                        backgroundColor: '#EFF6FF',
+                        borderRadius: '4px',
+                        px: 1.8,
+                        py: 0.6,
+                        fontSize: '14.5px',
+                        fontWeight: 800,
+                        color: '#0B4DB7',
+                        minWidth: '100px',
+                        textAlign: 'right',
+                        border: '1px solid #BFDBFE',
+                      }}
+                    >
+                      ₹{finalTotalAmount}
+                    </Box>
+                  </Box>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
-                  <Button
-                    variant="contained"
-                    disableElevation
-                    fullWidth
-                    onClick={handleCreateParticular}
-                    disabled={createLoading}
-                    sx={{
-                      backgroundColor: '#0284C7',
-                      color: '#FFFFFF',
-                      height: '36px',
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      textTransform: 'none',
-                      borderRadius: '6px',
-                      '&:hover': {
-                        backgroundColor: '#0369A1',
-                      },
-                    }}
-                  >
-                    {createLoading ? 'Creating...' : 'Click to Create'}
-                  </Button>
-                </Box>
+
+                <Button
+                  variant="contained"
+                  disableElevation
+                  onClick={handleCreateParticular}
+                  disabled={createLoading}
+                  sx={{
+                    backgroundColor: '#0284C7',
+                    color: '#FFFFFF',
+                    height: '38px',
+                    px: 3.5,
+                    fontSize: '13.5px',
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    borderRadius: '6px',
+                    '&:hover': {
+                      backgroundColor: '#0369A1',
+                    },
+                  }}
+                >
+                  {createLoading ? 'Creating...' : 'Click to Create'}
+                </Button>
               </Box>
             </Box>
           </Paper>
 
-          {/* Right Card: Product Grid & Entry */}
+          {/* Bottom Card: Product Grid & Entry */}
           <Paper
             elevation={0}
             sx={{
-              flex: 1,
               width: '100%',
               backgroundColor: '#FFFFFF',
               borderRadius: '8px',
@@ -1726,14 +1817,30 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
               }}
             >
               <Autocomplete
+                freeSolo
                 size="small"
                 autoHighlight
-                sx={{ flex: { xs: '1 1 100%', sm: 2.5 }, minWidth: '160px' }}
+                sx={{ flex: { xs: '1 1 100%', sm: 2.3 }, minWidth: '150px' }}
                 options={productOptions}
                 getOptionLabel={(option) => (typeof option === 'string' ? option : option.name || '')}
-                isOptionEqualToValue={(option, val) => option.id === val.id || option.name === val.name}
-                value={productOptions.find((p) => p.name === selectedProduct) || null}
-                onChange={(_, val) => setSelectedProduct(val ? val.name : '')}
+                isOptionEqualToValue={(option, val) =>
+                  typeof val === 'string'
+                    ? option.name === val
+                    : option.id === val.id || option.name === val.name
+                }
+                value={selectedProduct}
+                onChange={(_, val) => {
+                  if (typeof val === 'string') {
+                    setSelectedProduct(val);
+                  } else if (val && typeof val === 'object') {
+                    setSelectedProduct(val.name || '');
+                  } else {
+                    setSelectedProduct('');
+                  }
+                }}
+                onInputChange={(_, newInputValue) => {
+                  setSelectedProduct(newInputValue);
+                }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -1765,12 +1872,31 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
 
               <TextField
                 size="small"
-                placeholder="Case"
+                placeholder="HSN Code"
+                value={hsnCode}
+                onChange={(e) => setHsnCode(e.target.value)}
+                sx={{
+                  flex: { xs: '1 1 45%', sm: 0.9 },
+                  minWidth: '80px',
+                  '& .MuiOutlinedInput-root': {
+                    height: '36px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    borderRadius: '6px',
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                  },
+                }}
+              />
+
+              <TextField
+                size="small"
+                placeholder="No. of Counts"
                 type="number"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 sx={{
                   flex: { xs: '1 1 45%', sm: 1 },
+                  minWidth: '95px',
                   '& .MuiOutlinedInput-root': {
                     height: '36px',
                     fontSize: '13px',
@@ -1788,7 +1914,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                 value={rate}
                 onChange={(e) => setRate(e.target.value)}
                 sx={{
-                  flex: { xs: '1 1 45%', sm: 1 },
+                  flex: { xs: '1 1 45%', sm: 0.9 },
+                  minWidth: '70px',
                   '& .MuiOutlinedInput-root': {
                     height: '36px',
                     fontSize: '13px',
@@ -1806,7 +1933,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                 value={pkt}
                 onChange={(e) => setPkt(e.target.value)}
                 sx={{
-                  flex: { xs: '1 1 45%', sm: 1 },
+                  flex: { xs: '1 1 45%', sm: 0.9 },
+                  minWidth: '75px',
                   '& .MuiOutlinedInput-root': {
                     height: '36px',
                     fontSize: '13px',
@@ -1838,7 +1966,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                     },
                   },
                 }}
-                sx={{ flex: { xs: '1 1 45%', sm: 1.2 } }}
+                sx={{ flex: { xs: '1 1 45%', sm: 1.1 } }}
               />
 
               <Button
@@ -1877,7 +2005,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                         textAlign: 'center',
                         borderBottom: '1px solid #E2E8F0',
                         borderRight: '1px solid #E2E8F0',
-                        width: '30%',
+                        width: '26%',
                       }}
                     >
                       PARTICULAR
@@ -1893,10 +2021,10 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                         textAlign: 'center',
                         borderBottom: '1px solid #E2E8F0',
                         borderRight: '1px solid #E2E8F0',
-                        width: '14%',
+                        width: '13%',
                       }}
                     >
-                      CASE
+                      HSN CODE
                     </TableCell>
                     <TableCell
                       sx={{
@@ -1909,7 +2037,23 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                         textAlign: 'center',
                         borderBottom: '1px solid #E2E8F0',
                         borderRight: '1px solid #E2E8F0',
-                        width: '14%',
+                        width: '13%',
+                      }}
+                    >
+                      NO. OF COUNTS
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        py: 1.4,
+                        px: 1.5,
+                        fontSize: '11.5px',
+                        fontWeight: 700,
+                        color: '#1E293B',
+                        letterSpacing: '0.04em',
+                        textAlign: 'center',
+                        borderBottom: '1px solid #E2E8F0',
+                        borderRight: '1px solid #E2E8F0',
+                        width: '12%',
                       }}
                     >
                       RATE
@@ -1925,7 +2069,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                         textAlign: 'center',
                         borderBottom: '1px solid #E2E8F0',
                         borderRight: '1px solid #E2E8F0',
-                        width: '14%',
+                        width: '12%',
                       }}
                     >
                       PKT / UNITS
@@ -1940,6 +2084,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                         letterSpacing: '0.04em',
                         textAlign: 'center',
                         borderBottom: '1px solid #E2E8F0',
+                        borderRight: '1px solid #E2E8F0',
                         width: '14%',
                       }}
                     >
@@ -1955,7 +2100,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                         letterSpacing: '0.04em',
                         textAlign: 'center',
                         borderBottom: '1px solid #E2E8F0',
-                        width: '14%',
+                        width: '10%',
                       }}
                     >
                       ACTION
@@ -2034,6 +2179,51 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                               />
                             ) : (
                               row.particular
+                            )}
+                          </TableCell>
+
+                          <TableCell
+                            align="center"
+                            sx={{
+                              borderBottom: '1px solid #E2E8F0',
+                              borderRight: '1px solid #E2E8F0',
+                              fontWeight: 600,
+                              fontSize: '13px',
+                              color: '#334155',
+                              py: isEditing ? 0.8 : 1.2,
+                            }}
+                          >
+                            {isEditing ? (
+                              <TextField
+                                size="small"
+                                value={editRowData.hsn}
+                                placeholder="HSN"
+                                onChange={(e) =>
+                                  setEditRowData((prev) => ({ ...prev, hsn: e.target.value }))
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleSaveEditRow(row.id);
+                                  } else if (e.key === 'Escape') {
+                                    handleCancelEditRow();
+                                  }
+                                }}
+                                slotProps={{
+                                  input: {
+                                    sx: {
+                                      fontSize: '12.5px',
+                                      fontWeight: 600,
+                                      textAlign: 'center',
+                                      backgroundColor: '#FFFFFF',
+                                      '& input': { textAlign: 'center', py: 0.5, px: 0.5 },
+                                    },
+                                  },
+                                }}
+                                sx={{ width: '85px' }}
+                              />
+                            ) : (
+                              row.hsn || '-'
                             )}
                           </TableCell>
 
@@ -2582,7 +2772,10 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                       CUSTOMER
                     </TableCell>
                     <TableCell sx={{ py: 1.5, px: { xs: 2, sm: 2.5 }, fontSize: '11.5px', fontWeight: 700, color: '#1E293B' }}>
-                      COMPANY NAME
+                      PRODUCT NAME
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5, px: { xs: 1.5, sm: 2.5 }, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', width: '150px' }}>
+                      ADDRESS
                     </TableCell>
                     <TableCell align="right" sx={{ py: 1.5, px: { xs: 1.5, sm: 2.5 }, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', width: '110px' }}>
                       DEBIT
@@ -2601,13 +2794,13 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                 <TableBody>
                   {accountLoading ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                         <CircularProgress size={32} sx={{ color: '#0B4DB7' }} />
                       </TableCell>
                     </TableRow>
                   ) : sortedAccountDetails.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 6, color: '#64748B' }}>
+                      <TableCell colSpan={9} align="center" sx={{ py: 6, color: '#64748B' }}>
                         No account details found {filterCustomer && filterCustomer !== 'ALL' ? `for ${filterCustomer}` : ''}.
                       </TableCell>
                     </TableRow>
@@ -2633,8 +2826,49 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                           <TableCell sx={{ py: 1.6, px: { xs: 1.5, sm: 2.5 }, fontSize: '13.5px', fontWeight: 700, color: '#0B4DB7', borderBottom: isLast ? 'none' : '1px solid #EEF2F6' }}>
                             {row.customerName}
                           </TableCell>
-                          <TableCell sx={{ py: 1.6, px: { xs: 2, sm: 2.5 }, fontSize: '13.5px', fontWeight: 600, color: '#0F172A', borderBottom: isLast ? 'none' : '1px solid #EEF2F6' }}>
-                            {row.companyName && row.companyName !== 'General' ? row.companyName : '-'}
+                          <TableCell sx={{ py: 1.6, px: { xs: 2, sm: 2.5 }, fontSize: '13.5px', fontWeight: 600, color: '#0F172A', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', maxWidth: '240px' }}>
+                            {(() => {
+                              if (row.productName && row.productName !== 'General' && row.productName !== '-') {
+                                return row.productName;
+                              }
+                              const matchedPart = particularDetails.find(
+                                (p: any) =>
+                                  (row.particularId && (p._id === row.particularId || p.id === row.particularId)) ||
+                                  (row.billNo && p.billNo === row.billNo)
+                              );
+                              if (matchedPart && matchedPart.products && matchedPart.products.length > 0) {
+                                return matchedPart.products.map((p: any) => p.particular).filter(Boolean).join(', ');
+                              }
+                              if (row.companyName && row.companyName !== 'General' && row.companyName !== '-') {
+                                return row.companyName;
+                              }
+                              if (row.type === 'CREDIT' || row.type === 'ADVANCE') {
+                                return row.notes || row.paymentMode || 'Credit Added';
+                              }
+                              return '-';
+                            })()}
+                          </TableCell>
+                          <TableCell sx={{ py: 1.6, px: { xs: 1.5, sm: 2.5 }, fontSize: '13px', fontWeight: 500, color: '#334155', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', maxWidth: '160px' }}>
+                            {(() => {
+                              const targetCustomer = customerOptions.find(
+                                (c) => c.name.toLowerCase() === (row.customerName || '').toLowerCase()
+                              );
+                              const matchedPart = particularDetails.find(
+                                (p: any) =>
+                                  (row.particularId && (p._id === row.particularId || p.id === row.particularId)) ||
+                                  (row.billNo && p.billNo === row.billNo)
+                              );
+                              const rawAddr = row.address || matchedPart?.customerAddress || targetCustomer?.address || '';
+                              const formatted = formatCityAndPincode(rawAddr);
+                              if (!formatted || formatted === '-') return '-';
+                              return (
+                                <Tooltip title={rawAddr || formatted} arrow>
+                                  <span style={{ display: 'inline-block', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                                    {formatted}
+                                  </span>
+                                </Tooltip>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell align="right" sx={{ py: 1.6, px: { xs: 1.5, sm: 2.5 }, fontSize: '13.5px', fontWeight: 500, color: '#DC2626', borderBottom: isLast ? 'none' : '1px solid #EEF2F6' }}>
                             {row.debit}
@@ -2868,8 +3102,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                   <TableCell align="center" sx={{ py: 1.4, px: 1.5, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', width: '130px' }}>
                     CUSTOMER
                   </TableCell>
-                  <TableCell align="center" sx={{ py: 1.4, px: 1.5, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', width: '140px' }}>
-                    COMPANY NAME
+                  <TableCell align="center" sx={{ py: 1.4, px: 1.5, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', width: '150px' }}>
+                    PRODUCT NAME
                   </TableCell>
                   <TableCell align="center" sx={{ py: 1.4, px: 1.5, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', width: '95px' }}>
                     DATE
@@ -2880,19 +3114,13 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                   <TableCell align="center" sx={{ py: 1.4, px: 1, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', width: '80px' }}>
                     DISCOUNT
                   </TableCell>
-                  <TableCell align="center" sx={{ py: 1.4, px: 1, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', width: '80px' }}>
-                    PACKING
-                  </TableCell>
                   <TableCell align="center" sx={{ py: 1.4, px: 1, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', width: '75px' }}>
                     TAX
                   </TableCell>
                   <TableCell align="right" sx={{ py: 1.4, px: 1.5, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', width: '110px' }}>
                     NET TOTAL
                   </TableCell>
-                  <TableCell align="center" sx={{ py: 1.4, px: 1.5, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', width: '120px' }}>
-                    TRANSPORT
-                  </TableCell>
-                  <TableCell align="center" sx={{ py: 1.4, px: 1.5, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', width: '175px' }}>
+                  <TableCell align="center" sx={{ py: 1.4, px: 1.5, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', width: '150px' }}>
                     ACTION
                   </TableCell>
                 </TableRow>
@@ -2900,13 +3128,13 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
               <TableBody>
                 {particularLoading ? (
                   <TableRow>
-                    <TableCell colSpan={11} align="center" sx={{ py: 6 }}>
+                    <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                       <CircularProgress size={32} sx={{ color: '#0B4DB7' }} />
                     </TableCell>
                   </TableRow>
                 ) : sortedParticularDetails.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} align="center" sx={{ py: 6, color: '#64748B' }}>
+                    <TableCell colSpan={9} align="center" sx={{ py: 6, color: '#64748B' }}>
                       No particular bills found {filterCustomer !== 'ALL' ? `for ${filterCustomer}` : ''}.
                     </TableCell>
                   </TableRow>
@@ -2917,10 +3145,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                     const subtotalNum = parseFloat(String(row.amount || row.total || '0').replace(/,/g, '')) || 0;
                     const totalNum = parseFloat(String(row.total || row.amount || '0').replace(/,/g, '')) || 0;
                     const discStr = row.discount && parseFloat(row.discount) > 0 ? (parseFloat(row.discount) <= 100 ? `${row.discount}%` : `₹${row.discount}`) : '-';
-                    const packStr = row.packing && parseFloat(row.packing) > 0 ? (parseFloat(row.packing) <= 100 ? `${row.packing}%` : `₹${row.packing}`) : '-';
                     const taxStr = row.tax && parseFloat(row.tax) > 0 ? `₹${parseFloat(row.tax).toLocaleString('en-IN')}` : '-';
-                    const hasPdf = Boolean(row.pdfData && row.pdfData.trim() !== '');
-                    const isUploading = uploadingBillId === rowId;
 
                     return (
                       <TableRow
@@ -2937,8 +3162,19 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                         <TableCell align="center" sx={{ py: 1.4, px: 1.5, fontSize: '13px', fontWeight: 700, color: '#0B4DB7', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6' }}>
                           {row.customerName}
                         </TableCell>
-                        <TableCell align="center" sx={{ py: 1.4, px: 1.5, fontSize: '13px', fontWeight: 600, color: '#0F172A', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6' }}>
-                          {row.companyName && row.companyName !== 'General' ? row.companyName : '-'}
+                        <TableCell align="center" sx={{ py: 1.4, px: 1.5, fontSize: '13px', fontWeight: 600, color: '#0F172A', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6', maxWidth: '200px' }}>
+                          {(() => {
+                            const productNames = (row.products || []).map((p: any) => p.particular).filter(Boolean);
+                            if (productNames.length === 0) return row.companyName && row.companyName !== 'General' ? row.companyName : '-';
+                            const joined = productNames.join(', ');
+                            return (
+                              <Tooltip title={joined} arrow>
+                                <span style={{ display: 'inline-block', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                                  {joined}
+                                </span>
+                              </Tooltip>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell align="center" sx={{ py: 1.4, px: 1.5, fontSize: '12.5px', fontWeight: 500, color: '#475569', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6' }}>
                           {row.date}
@@ -2949,17 +3185,11 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                         <TableCell align="center" sx={{ py: 1.4, px: 1, fontSize: '12.5px', fontWeight: 600, color: discStr !== '-' ? '#DC2626' : '#94A3B8', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6' }}>
                           {discStr}
                         </TableCell>
-                        <TableCell align="center" sx={{ py: 1.4, px: 1, fontSize: '12.5px', fontWeight: 600, color: packStr !== '-' ? '#0F172A' : '#94A3B8', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6' }}>
-                          {packStr}
-                        </TableCell>
                         <TableCell align="center" sx={{ py: 1.4, px: 1, fontSize: '12.5px', fontWeight: 600, color: taxStr !== '-' ? '#0F172A' : '#94A3B8', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6' }}>
                           {taxStr}
                         </TableCell>
                         <TableCell align="right" sx={{ py: 1.4, px: 1.5, fontSize: '13.5px', fontWeight: 800, color: '#0F172A', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6' }}>
                           ₹{totalNum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell align="center" sx={{ py: 1.4, px: 1.5, fontSize: '12.5px', fontWeight: 500, color: '#334155', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6' }}>
-                          {row.transport || row.transportName || '-'}
                         </TableCell>
                         <TableCell align="center" sx={{ py: 1.4, px: 1.5, borderBottom: isLast ? 'none' : '1px solid #EEF2F6' }}>
                           <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 0.6 }}>
@@ -3036,40 +3266,6 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                               </IconButton>
                             </Tooltip>
 
-                            {/* PDF Upload / View Button (Under 1 MB) */}
-                            <Tooltip
-                              title={
-                                hasPdf
-                                  ? `View PDF (${row.pdfName || 'Attached Document'})`
-                                  : 'Upload PDF (Under 1 MB)'
-                              }
-                              arrow
-                            >
-                              <IconButton
-                                size="small"
-                                onClick={() => (hasPdf ? handleOpenPdfPreview(row) : handleTriggerPdfUpload(rowId))}
-                                disabled={isUploading}
-                                sx={{
-                                  backgroundColor: hasPdf ? '#16A34A' : '#6366F1',
-                                  color: '#FFFFFF',
-                                  borderRadius: '4px',
-                                  width: '24px',
-                                  height: '22px',
-                                  p: 0,
-                                  '&:hover': { backgroundColor: hasPdf ? '#15803D' : '#4F46E5' },
-                                  '&.Mui-disabled': { backgroundColor: '#CBD5E1', color: '#FFFFFF' },
-                                }}
-                              >
-                                {isUploading ? (
-                                  <CircularProgress size={12} sx={{ color: '#FFFFFF' }} />
-                                ) : hasPdf ? (
-                                  <PictureAsPdfRoundedIcon sx={{ fontSize: 14 }} />
-                                ) : (
-                                  <UploadFileRoundedIcon sx={{ fontSize: 14 }} />
-                                )}
-                              </IconButton>
-                            </Tooltip>
-
                             <Tooltip title="Delete" arrow>
                               <IconButton
                                 size="small"
@@ -3099,8 +3295,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
         </Paper>
       )}
 
-      {/* View 5: Add Credit View */}
-      {activeSubTab === 'Add Credit' && (
+      {/* View 5: Add Credit View (Super Admin Only) */}
+      {activeSubTab === 'Add Credit' && isSuperAdmin && (
         <Box
           sx={{
             display: 'flex',
@@ -3194,65 +3390,6 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ initialCustomerName,
                           borderRadius: '6px',
                           fontSize: '13.5px',
                           fontWeight: 600,
-                          color: '#0F172A',
-                          '& fieldset': {
-                            borderColor: '#CBD5E1',
-                          },
-                          '&:hover fieldset': {
-                            borderColor: '#94A3B8',
-                          },
-                          '&.Mui-focused fieldset': {
-                            borderColor: '#0B4DB7',
-                            borderWidth: '1.5px',
-                          },
-                        },
-                      }}
-                    />
-                  )}
-                />
-              </Box>
-
-              {/* Company Name */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexDirection: { xs: 'column', sm: 'row' },
-                  alignItems: { xs: 'flex-start', sm: 'center' },
-                  gap: { xs: 1, sm: 3.5 },
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: '#0F172A',
-                    minWidth: '150px',
-                    textAlign: { sm: 'right' },
-                  }}
-                >
-                  Company Name
-                </Typography>
-                <Autocomplete
-                  fullWidth
-                  size="small"
-                  autoHighlight
-                  options={companyOptions}
-                  getOptionLabel={(option) => (typeof option === 'string' ? option : option.name || '')}
-                  isOptionEqualToValue={(option, val) => option.id === val.id || option.name === val.name}
-                  value={companyOptions.find((c) => c.name === addCreditCompanyName) || null}
-                  onChange={(_, val) => setAddCreditCompanyName(val ? val.name : '')}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      placeholder="Search Company..."
-                      sx={{
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: '6px',
-                        '& .MuiOutlinedInput-root': {
-                          height: '42px',
-                          borderRadius: '6px',
-                          fontSize: '13.5px',
-                          fontWeight: 500,
                           color: '#0F172A',
                           '& fieldset': {
                             borderColor: '#CBD5E1',

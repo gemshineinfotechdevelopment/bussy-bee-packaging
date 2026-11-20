@@ -1,4 +1,5 @@
-﻿import type { BillPrintData } from '../components/BillPrintTemplate';
+import type { BillPrintData } from '../components/BillPrintTemplate';
+import { numberToWords } from '../components/BillPrintTemplate';
 
 /**
  * Robust date parser supporting DD-MM-YYYY, YYYY-MM-DD, DD/MM/YYYY, ISO, etc.
@@ -121,24 +122,89 @@ export const generateBillHtml = (bill: BillPrintData): string => {
     ? bill.caseCount
     : (bill.products || []).reduce((acc, p) => acc + (parseFloat(String(p.quantity)) || 0), 0);
 
-  const preparedBy = bill.preparedBy || 'S.Nagaraj';
-  const transportName = bill.transport && bill.transport.trim() !== '' && bill.transport !== '-' ? bill.transport.trim() : '-';
-  const receiptSrc = bill.pdfData || bill.pdfUrl || '';
+  const custAddr = bill.customerAddress && bill.customerAddress.trim() ? bill.customerAddress.trim() : 'Main Road, Sivakasi - 626123';
+  const custGst = bill.customerGst && bill.customerGst.trim() ? bill.customerGst.trim() : '-';
+  const custPhone = bill.customerMobile || bill.phone || '+91 98765 43210';
+  const traderName = bill.traderName && bill.traderName !== 'BUSSY BEE TRADERS' ? bill.traderName : '';
+  const traderAddress = bill.traderAddress && bill.traderAddress !== 'Main Road, Sivakasi - 626123, Tamil Nadu' ? bill.traderAddress : '';
+  const traderGst = bill.traderGst && bill.traderGst !== 'GSTIN: 33AAAAA0000A1Z5 | State: Tamil Nadu (33)' ? bill.traderGst : '';
+
+  // Taxable Value & GST Calculation
+  const totalTaxableValue = Math.max(0, subtotal - discountAmt);
+
+  const hsnMap: { [key: string]: { hsn: string; amount: number } } = {};
+  const products = bill.products && bill.products.length > 0 ? bill.products : [];
+
+  if (products.length > 0) {
+    products.forEach((p) => {
+      const hsnKey = p.hsn && p.hsn.trim() !== '' ? p.hsn.trim() : '4819';
+      const pAmt = parseFloat(String(p.amount).replace(/,/g, '')) || 0;
+      if (!hsnMap[hsnKey]) {
+        hsnMap[hsnKey] = { hsn: hsnKey, amount: 0 };
+      }
+      hsnMap[hsnKey].amount += pAmt;
+    });
+  } else {
+    hsnMap['4819'] = { hsn: '4819', amount: subtotal };
+  }
+
+  const hsnEntries = Object.values(hsnMap);
+  const totalProdSum = hsnEntries.reduce((s, e) => s + e.amount, 0) || 1;
+
+  const gstGroups = hsnEntries.map((entry) => {
+    const proportion = entry.amount / totalProdSum;
+    const groupTaxable = totalTaxableValue * proportion;
+    const groupTax = taxAmt * proportion;
+    const cgstAmt = groupTax / 2;
+    const sgstAmt = groupTax / 2;
+    const totalGroupTax = cgstAmt + sgstAmt;
+
+    const ratePercent = groupTaxable > 0 ? (groupTax / groupTaxable) * 100 : 0;
+    const cgstRate = (ratePercent / 2).toFixed(1).replace(/\.0$/, '');
+    const sgstRate = (ratePercent / 2).toFixed(1).replace(/\.0$/, '');
+
+    return {
+      hsn: entry.hsn,
+      taxableValue: groupTaxable,
+      cgstRate,
+      cgstAmount: cgstAmt,
+      sgstRate,
+      sgstAmount: sgstAmt,
+      totalTax: totalGroupTax,
+    };
+  });
+
+  const totalCgstAmount = taxAmt / 2;
+  const totalSgstAmount = taxAmt / 2;
+  const totalGstAmount = taxAmt;
 
   const productRowsHtml = (bill.products || []).map((item, idx) => {
     const numAmt = parseFloat(String(item.amount).replace(/,/g, '')) || 0;
     const isEven = idx % 2 === 1;
     return `
       <tr style="background-color: ${isEven ? '#F8FAFC' : '#FFFFFF'};">
-        <td style="border: 1px solid #CBD5E1; padding: 7px 8px; text-align: center; color: #475569; font-weight: 600;">${idx + 1}</td>
+        <td style="border: 1px solid #CBD5E1; padding: 7px 5px; text-align: center; color: #475569; font-weight: 600;">${idx + 1}</td>
         <td style="border: 1px solid #CBD5E1; padding: 7px 10px; text-align: left; font-weight: 700; color: #0F172A;">${item.particular || '-'}</td>
-        <td style="border: 1px solid #CBD5E1; padding: 7px 8px; text-align: center; font-weight: 700; color: #0F172A;">${item.quantity || '-'}</td>
-        <td style="border: 1px solid #CBD5E1; padding: 7px 8px; text-align: right; color: #334155;">â‚¹ ${(parseFloat(String(item.rate)) || 0).toFixed(2)}</td>
-        <td style="border: 1px solid #CBD5E1; padding: 7px 8px; text-align: center; color: #64748B;">${item.pktUnit && item.pktUnit !== '-' ? item.pktUnit : '-'}</td>
-        <td style="border: 1px solid #CBD5E1; padding: 7px 10px; text-align: right; font-weight: 800; color: #0F172A;">â‚¹ ${numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="border: 1px solid #CBD5E1; padding: 7px 6px; text-align: center; color: #475569; font-weight: 600;">${item.hsn && item.hsn.trim() !== '' ? item.hsn.trim() : '-'}</td>
+        <td style="border: 1px solid #CBD5E1; padding: 7px 6px; text-align: center; font-weight: 700; color: #0F172A;">${item.quantity || '-'}</td>
+        <td style="border: 1px solid #CBD5E1; padding: 7px 8px; text-align: right; color: #334155;">₹ ${(parseFloat(String(item.rate)) || 0).toFixed(2)}</td>
+        <td style="border: 1px solid #CBD5E1; padding: 7px 6px; text-align: center; color: #64748B;">${item.pktUnit && item.pktUnit !== '-' ? item.pktUnit : '-'}</td>
+        <td style="border: 1px solid #CBD5E1; padding: 7px 10px; text-align: right; font-weight: 800; color: #0F172A;">₹ ${numAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
       </tr>
     `;
   }).join('');
+
+  const gstRowsHtml = gstGroups.map((g, idx) => `
+    <tr style="background-color: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'};">
+      <td style="border: 1px solid #CBD5E1; padding: 6px 4px; text-align: center; font-weight: 700;">${g.hsn}</td>
+      <td style="border: 1px solid #CBD5E1; padding: 6px 8px; text-align: right; font-weight: 600;">₹ ${g.taxableValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td style="border: 1px solid #CBD5E1; padding: 6px 4px; text-align: center; color: #475569;">${g.cgstRate}%</td>
+      <td style="border: 1px solid #CBD5E1; padding: 6px 8px; text-align: right; font-weight: 600;">₹ ${g.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td style="border: 1px solid #CBD5E1; padding: 6px 4px; text-align: center; color: #475569;">${g.sgstRate}%</td>
+      <td style="border: 1px solid #CBD5E1; padding: 6px 8px; text-align: right; font-weight: 600;">₹ ${g.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td style="border: 1px solid #CBD5E1; padding: 6px 8px; text-align: right; font-weight: 700;">₹ ${g.totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+    </tr>
+  `).join('');
 
   return `
 <!DOCTYPE html>
@@ -170,34 +236,38 @@ export const generateBillHtml = (bill: BillPrintData): string => {
       padding: 6px;
     }
     .top-header {
-      position: relative;
       text-align: center;
       border-bottom: 2px solid #0F172A;
-      padding-bottom: 8px;
+      padding-bottom: 10px;
       margin-bottom: 12px;
-    }
-    .signatory {
-      position: absolute;
-      right: 0;
-      top: 0;
-      font-size: 12px;
-      font-weight: 700;
-      color: #475569;
     }
     .comp-name {
       font-size: 26px;
       font-weight: 900;
       color: #0B4DB7;
       margin-bottom: 2px;
-      letter-spacing: -0.01em;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
     }
-    .comp-sub {
+    .comp-trader {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #0F172A;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 2px;
+    }
+    .comp-addr {
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 2px;
+    }
+    .comp-gst {
       font-size: 11px;
       font-weight: 700;
-      color: #475569;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      color: #1E293B;
+      margin-bottom: 6px;
     }
     .doc-type-badge {
       display: inline-block;
@@ -205,51 +275,63 @@ export const generateBillHtml = (bill: BillPrintData): string => {
       color: #FFFFFF;
       font-size: 11px;
       font-weight: 800;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      padding: 3px 12px;
+      padding: 3px 18px;
       border-radius: 4px;
-      margin-top: 6px;
     }
-    .meta-box {
-      display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 12px;
-      border: 1px solid #CBD5E1;
-      border-radius: 6px;
-      padding: 10px 14px;
-      background-color: #F8FAFC;
-      margin-bottom: 14px;
-      font-size: 12.5px;
-    }
-    .meta-row {
+    .meta-bar {
       display: flex;
-      margin-bottom: 4px;
-      line-height: 1.4;
-    }
-    .meta-label {
-      width: 120px;
-      color: #64748B;
-      font-weight: 600;
+      justify-content: space-between;
+      align-items: center;
+      background: #F8FAFC;
+      border: 1px solid #CBD5E1;
+      border-radius: 4px;
+      padding: 6px 12px;
+      margin-bottom: 10px;
       font-size: 12px;
     }
-    .meta-val {
+    .boxes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .party-box {
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      padding: 10px 12px;
+      background-color: #FAFAFA;
+      font-size: 11.5px;
+    }
+    .party-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: #0B4DB7;
+      border-bottom: 1px solid #E2E8F0;
+      padding-bottom: 4px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .party-name {
+      font-size: 13px;
       font-weight: 700;
       color: #0F172A;
-      flex: 1;
+      margin-bottom: 3px;
     }
     .prod-table {
       width: 100%;
       border-collapse: collapse;
       border: 1px solid #0F172A;
       font-size: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .prod-table th {
       background-color: #0F172A;
       color: #FFFFFF;
       border: 1px solid #0F172A;
-      padding: 8px 8px;
+      padding: 8px 6px;
       font-weight: 800;
       font-size: 11px;
       letter-spacing: 0.03em;
@@ -257,41 +339,29 @@ export const generateBillHtml = (bill: BillPrintData): string => {
     }
     .prod-table td {
       border: 1px solid #CBD5E1;
-      padding: 7px 8px;
+      padding: 7px 6px;
       vertical-align: middle;
     }
-    .split-bottom {
+    .summary-split {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
-      gap: 16px;
+      align-items: stretch;
+      gap: 12px;
+      margin-bottom: 14px;
       page-break-inside: avoid;
     }
-    .receipt-box {
-      flex: 1 1 50%;
-      max-width: 48%;
+    .words-box {
+      flex: 1 1 52%;
       border: 1px solid #CBD5E1;
       border-radius: 6px;
-      min-height: 160px;
-      max-height: 220px;
+      padding: 12px 14px;
+      background-color: #F8FAFC;
       display: flex;
-      align-items: center;
+      flex-direction: column;
       justify-content: center;
-      background: #F8FAFC;
-      padding: 6px;
-      box-sizing: border-box;
-      overflow: hidden;
-    }
-    .receipt-img {
-      max-width: 100%;
-      max-height: 205px;
-      object-fit: contain;
-      display: block;
-      border-radius: 4px;
     }
     .summary-box {
-      flex: 1 1 50%;
-      max-width: 48%;
+      flex: 1 1 48%;
     }
     .summary-table {
       width: 100%;
@@ -301,7 +371,7 @@ export const generateBillHtml = (bill: BillPrintData): string => {
     }
     .summary-table td {
       border: 1px solid #CBD5E1;
-      padding: 6px 10px;
+      padding: 5px 8px;
     }
     .summary-label-cell {
       font-weight: 600;
@@ -317,26 +387,45 @@ export const generateBillHtml = (bill: BillPrintData): string => {
       background-color: #0F172A !important;
       color: #FFFFFF !important;
       font-weight: 900;
-      font-size: 14px;
-      padding: 8px 10px;
+      font-size: 13.5px;
+      padding: 7px 8px;
       border: 1px solid #0F172A !important;
     }
     .summary-total-row .summary-val-cell {
       color: #FFFFFF !important;
     }
+    .gst-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #0F172A;
+      font-size: 11px;
+      margin-bottom: 14px;
+      page-break-inside: avoid;
+    }
+    .gst-table th {
+      background-color: #F8FAFC;
+      color: #0F172A;
+      border: 1px solid #CBD5E1;
+      padding: 5px 4px;
+      font-weight: 800;
+    }
+    .gst-table td {
+      border: 1px solid #CBD5E1;
+      padding: 6px 6px;
+    }
     .sig-section {
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
-      margin-top: 24px;
-      padding-top: 14px;
+      margin-top: 16px;
+      padding-top: 12px;
       border-top: 1px dashed #CBD5E1;
       font-size: 11.5px;
       page-break-inside: avoid;
     }
     .sig-block {
       text-align: center;
-      width: 160px;
+      width: 170px;
     }
     .sig-line {
       border-top: 1px solid #0F172A;
@@ -348,24 +437,36 @@ export const generateBillHtml = (bill: BillPrintData): string => {
   <div class="bill-wrapper">
     <!-- Header -->
     <div class="top-header">
-      <div class="signatory">Prepared By: <b>${preparedBy}</b></div>
-      <div class="comp-name">Bussy Bee</div>
-      <div class="comp-sub">Wholesale & Retail Trading â€¢ Sivakasi</div>
-      <div><span class="doc-type-badge">ESTIMATE / PARTICULAR BILL</span></div>
+      <div class="comp-name">BUSSY BEE</div>
+      ${traderName ? `<div class="comp-trader">${traderName}</div>` : ''}
+      ${traderAddress ? `<div class="comp-addr">${traderAddress}</div>` : ''}
+      ${traderGst ? `<div class="comp-gst">${traderGst}</div>` : ''}
+      <div><span class="doc-type-badge">ESTIMATE</span></div>
     </div>
 
-    <!-- Metadata Block -->
-    <div class="meta-box">
-      <div>
-        <div class="meta-row"><span class="meta-label">Bill No:</span><span class="meta-val" style="color:#0B4DB7; font-size:14px;">#${bill.billNo || '-'}</span></div>
-        <div class="meta-row"><span class="meta-label">Customer Name:</span><span class="meta-val">${bill.customerName || '-'}</span></div>
-        ${bill.companyName && bill.companyName.trim() ? `<div class="meta-row"><span class="meta-label">Company Name:</span><span class="meta-val">${bill.companyName.trim()}</span></div>` : ''}
-        <div class="meta-row"><span class="meta-label">Transport Name:</span><span class="meta-val">${transportName}</span></div>
+    <!-- Meta Bar -->
+    <div class="meta-bar">
+      <div><span style="color:#64748B; font-weight:600;">Bill No: </span><strong style="color:#0B4DB7; font-size:13.5px;">#${bill.billNo || '-'}</strong></div>
+      <div><span style="color:#64748B; font-weight:600;">Date: </span><strong style="color:#0F172A;">${bill.date || '-'}</strong></div>
+      <div><span style="color:#64748B; font-weight:600;">Total Counts: </span><strong style="color:#0B4DB7;">${computedCases}</strong></div>
+      <div><span style="color:#64748B; font-weight:600;">Phone: </span><strong style="color:#0F172A;">${custPhone}</strong></div>
+    </div>
+
+    <!-- 2 Boxes: Consignee & Buyer -->
+    <div class="boxes-grid">
+      <div class="party-box">
+        <div class="party-title">Consignee (Ship to)</div>
+        <div class="party-name">${bill.customerName || '-'}</div>
+        <div style="color:#475569; margin-bottom:3px; line-height:1.4;">${custAddr}</div>
+        <div style="color:#334155; margin-bottom:2px;"><strong>GSTIN / UIN:</strong> ${custGst}</div>
+        <div style="color:#334155;"><strong>State Name:</strong> Tamil Nadu, Code: 33</div>
       </div>
-      <div>
-        <div class="meta-row"><span class="meta-label">Date:</span><span class="meta-val">${bill.date || '-'}</span></div>
-        <div class="meta-row"><span class="meta-label">Total Cases:</span><span class="meta-val" style="font-size:13.5px; color:#0B4DB7;">${computedCases}</span></div>
-        <div class="meta-row"><span class="meta-label">Phone:</span><span class="meta-val">${bill.phone || '+91 98765 43210'}</span></div>
+      <div class="party-box">
+        <div class="party-title">Buyer (Bill to)</div>
+        <div class="party-name">${bill.customerName || '-'}</div>
+        <div style="color:#475569; margin-bottom:3px; line-height:1.4;">${custAddr}</div>
+        <div style="color:#334155; margin-bottom:2px;"><strong>GSTIN / UIN:</strong> ${custGst}</div>
+        <div style="color:#334155;"><strong>State Name:</strong> Tamil Nadu, Code: 33</div>
       </div>
     </div>
 
@@ -373,71 +474,120 @@ export const generateBillHtml = (bill: BillPrintData): string => {
     <table class="prod-table">
       <thead>
         <tr>
-          <th style="width: 40px; text-align: center;">#</th>
+          <th style="width: 35px; text-align: center;">#</th>
           <th style="text-align: left;">Particular / Product Description</th>
-          <th style="width: 75px; text-align: center;">Cases</th>
-          <th style="width: 85px; text-align: right;">Rate (â‚¹)</th>
+          <th style="width: 90px; text-align: center;">HSN / SAC</th>
+          <th style="width: 75px; text-align: center;">Counts</th>
+          <th style="width: 85px; text-align: right;">Rate (₹)</th>
           <th style="width: 80px; text-align: center;">Pkt / Unit</th>
-          <th style="width: 110px; text-align: right;">Amount (â‚¹)</th>
+          <th style="width: 105px; text-align: right;">Amount (₹)</th>
         </tr>
       </thead>
       <tbody>
-        ${productRowsHtml || '<tr><td colspan="6" style="text-align:center; padding:16px; color:#64748B;">No product items attached.</td></tr>'}
+        ${productRowsHtml || '<tr><td colspan="7" style="text-align:center; padding:16px; color:#64748B;">No product items attached.</td></tr>'}
       </tbody>
     </table>
 
-    <!-- Bottom Split Section: Left Uploaded Receipt & Right Summary Box -->
-    <div class="split-bottom">
-      <!-- Left Column: Uploaded Godown / Transport Receipt -->
-      <div class="receipt-box">
-        ${
-          receiptSrc
-            ? `<img src="${receiptSrc}" class="receipt-img" alt="Transport Receipt" />`
-            : `<div style="text-align: center; color: #64748B; font-size: 11.5px; padding: 14px;">
-                 <div style="font-weight: 700; color: #0F172A; margin-bottom: 4px; font-size: 12px;">TRANSPORT / GODOWN RECEIPT</div>
-                 <div>(No physical receipt attached for this bill)</div>
-               </div>`
-        }
+    <!-- Amount Chargeable in words + Summary -->
+    <div class="summary-split">
+      <div class="words-box">
+        <div style="font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 5px;">
+          Amount Chargeable (in words):
+        </div>
+        <div style="font-size: 13px; font-weight: 800; color: #0F172A; line-height: 1.4;">
+          ${numberToWords(finalTotalNum)}
+        </div>
       </div>
 
-      <!-- Right Column: Summary Table -->
       <div class="summary-box">
         <table class="summary-table">
           <tbody>
             <tr>
               <td class="summary-label-cell">Subtotal / Particular Amount</td>
-              <td class="summary-val-cell">â‚¹ ${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td class="summary-val-cell">₹ ${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
-            <tr>
-              <td class="summary-label-cell" style="color: ${discountAmt > 0 ? '#DC2626' : '#334155'};">${discountLabel}</td>
-              <td class="summary-val-cell" style="color: ${discountAmt > 0 ? '#DC2626' : '#64748B'};">- â‚¹ ${discountAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            </tr>
-            <tr>
-              <td class="summary-label-cell">${packingLabel}</td>
-              <td class="summary-val-cell" style="color: ${packingAmt > 0 ? '#0F172A' : '#64748B'};">+ â‚¹ ${packingAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            </tr>
-            <tr>
-              <td class="summary-label-cell">${taxLabel}</td>
-              <td class="summary-val-cell" style="color: ${taxAmt > 0 ? '#0F172A' : '#64748B'};">+ â‚¹ ${taxAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            </tr>
+            ${
+              discountAmt > 0
+                ? `<tr>
+                     <td class="summary-label-cell" style="color: #DC2626;">${discountLabel}</td>
+                     <td class="summary-val-cell" style="color: #DC2626;">- ₹ ${discountAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                   </tr>`
+                : ''
+            }
+            ${
+              packingAmt > 0
+                ? `<tr>
+                     <td class="summary-label-cell">${packingLabel}</td>
+                     <td class="summary-val-cell">+ ₹ ${packingAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                   </tr>`
+                : ''
+            }
+            ${
+              taxAmt > 0
+                ? `<tr>
+                     <td class="summary-label-cell">${taxLabel}</td>
+                     <td class="summary-val-cell">+ ₹ ${taxAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                   </tr>`
+                : ''
+            }
             <tr class="summary-total-row">
               <td>NET TOTAL AMOUNT</td>
-              <td class="summary-val-cell">â‚¹ ${formattedTotal}</td>
+              <td class="summary-val-cell">₹ ${formattedTotal}</td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
 
+    <!-- GST Breakdown Table -->
+    <table class="gst-table">
+      <thead>
+        <tr>
+          <th rowspan="2" style="width: 85px; text-align: center;">HSN / SAC</th>
+          <th rowspan="2" style="text-align: right;">Taxable Value (₹)</th>
+          <th colspan="2" style="text-align: center;">Central Tax (CGST)</th>
+          <th colspan="2" style="text-align: center;">State Tax (SGST / UTGST)</th>
+          <th rowspan="2" style="text-align: right;">Total Tax Amount (₹)</th>
+        </tr>
+        <tr>
+          <th style="width: 60px; text-align: center;">Rate (%)</th>
+          <th style="width: 80px; text-align: right;">Amount (₹)</th>
+          <th style="width: 60px; text-align: center;">Rate (%)</th>
+          <th style="width: 80px; text-align: right;">Amount (₹)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${gstRowsHtml}
+      </tbody>
+      <tfoot>
+        <tr style="background-color: #F1F5F9; font-weight: 800;">
+          <td style="text-align: center;">Total</td>
+          <td style="text-align: right; color: #0F172A;">₹ ${totalTaxableValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td></td>
+          <td style="text-align: right;">₹ ${totalCgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td></td>
+          <td style="text-align: right;">₹ ${totalSgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="text-align: right; color: #0B4DB7; font-weight: 900;">₹ ${totalGstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>
+      </tfoot>
+    </table>
+    ${
+      taxAmt > 0
+        ? `<div style="font-size: 11px; color: #475569; margin-top: -8px; margin-bottom: 12px; font-style: italic;">
+             Tax Amount (in words): <strong>${numberToWords(totalGstAmount)}</strong>
+           </div>`
+        : ''
+    }
+
     <!-- Signatures -->
     <div class="sig-section">
       <div class="sig-block">
-        <div style="height: 28px;"></div>
+        <div style="height: 24px;"></div>
         <div class="sig-line"></div>
         <div style="font-weight: 700; color:#334155;">Customer Signature</div>
       </div>
       <div class="sig-block">
-        <div style="font-weight: 700; color:#0F172A; margin-bottom: 24px;">For Bussy Bee</div>
+        <div style="font-weight: 800; color:#0F172A; margin-bottom: 22px;">For ${traderName || 'BUSSY BEE'}</div>
         <div class="sig-line"></div>
         <div style="font-weight: 700; color:#334155;">Authorized Signatory</div>
       </div>
@@ -1403,8 +1553,10 @@ export const generateParticularsListPrintHtml = (particulars: any[], dateRangeTe
       const subAmt = parseFloat(String(p.amount || p.total || '0').replace(/,/g, '')) || amt;
 
       const discStr = p.discount && String(p.discount).trim() !== '' && p.discount !== '0' && p.discount !== '-' ? String(p.discount) : '-';
-      const packStr = p.packing && String(p.packing).trim() !== '' && p.packing !== '0' && p.packing !== '-' ? String(p.packing) : '-';
-      const taxStr = p.tax && String(p.tax).trim() !== '' && p.tax !== '0' && p.tax !== '-' ? `â‚¹${p.tax}` : '-';
+      const taxStr = p.tax && String(p.tax).trim() !== '' && p.tax !== '0' && p.tax !== '-' ? `₹${p.tax}` : '-';
+
+      const prodNames = (p.products || []).map((x: any) => x.particular).filter(Boolean);
+      const prodDisplay = prodNames.length > 0 ? prodNames.join(', ') : (p.companyName || '-');
 
       return `
         <tr class="data-row" style="background-color: ${isEven ? '#F8FAFC' : '#FFFFFF'};">
@@ -1412,13 +1564,12 @@ export const generateParticularsListPrintHtml = (particulars: any[], dateRangeTe
           <td class="text-center" style="font-weight:800; color:#0B4DB7; width:52px;">#${p.billNo || '-'}</td>
           <td class="text-center" style="width:65px; color:#334155;">${p.date || '-'}</td>
           <td style="font-weight:700; color:#0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">${p.customerName || '-'}</td>
-          <td style="color:#475569; font-size:9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 105px;">${p.companyName || '-'}</td>
+          <td style="color:#475569; font-size:9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;">${prodDisplay}</td>
           <td class="text-center" style="width:38px; font-weight:700;">${p.caseCount || '-'}</td>
-          <td class="text-right" style="width:72px; color:#334155;">â‚¹ ${subAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          <td class="text-right" style="width:72px; color:#334155;">₹ ${subAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
           <td class="text-center" style="width:42px; color:${discStr !== '-' ? '#DC2626' : '#94A3B8'}; font-weight:600;">${discStr}</td>
-          <td class="text-center" style="width:42px; color:${packStr !== '-' ? '#0F172A' : '#94A3B8'}; font-weight:600;">${packStr}</td>
           <td class="text-center" style="width:42px; color:${taxStr !== '-' ? '#0F172A' : '#94A3B8'}; font-weight:600;">${taxStr}</td>
-          <td class="text-right" style="font-weight:800; width:82px; color:#0F172A;">â‚¹ ${amt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          <td class="text-right" style="font-weight:800; width:82px; color:#0F172A;">₹ ${amt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
         </tr>
       `;
     }).join('');
@@ -1482,26 +1633,25 @@ export const generateParticularsListPrintHtml = (particulars: any[], dateRangeTe
               <th class="text-center" style="width:52px;">Bill No</th>
               <th class="text-center" style="width:65px;">Date</th>
               <th style="width:140px;">Customer Name</th>
-              <th style="width:105px;">Company</th>
+              <th style="width:120px;">Product Name</th>
               <th class="text-center" style="width:38px;">Cases</th>
               <th class="text-right" style="width:72px;">Subtotal</th>
               <th class="text-center" style="width:42px;">Disc</th>
-              <th class="text-center" style="width:42px;">Pack</th>
               <th class="text-center" style="width:42px;">Tax</th>
               <th class="text-right" style="width:82px;">Net Total</th>
             </tr>
           </thead>
           <tbody>
-            ${pageRowsHtml || '<tr><td colspan="11" class="text-center" style="padding:18px; color:#64748B;">No bill records found for the selected period.</td></tr>'}
+            ${pageRowsHtml || '<tr><td colspan="10" class="text-center" style="padding:18px; color:#64748B;">No bill records found for the selected period.</td></tr>'}
           </tbody>
           <tfoot>
             <!-- Page Total Row (Bottom of EVERY page) -->
             <tr class="page-total-row">
               <td colspan="5" class="text-right" style="padding-right:8px;">PAGE ${pageIdx + 1} TOTAL (${pageItems.length} Bills):</td>
               <td class="text-center">${pageCasesSum}</td>
-              <td class="text-right">â‚¹ ${pageSubtotalSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-              <td colspan="3"></td>
-              <td class="text-right">â‚¹ ${pageTotalSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+              <td class="text-right">₹ ${pageSubtotalSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+              <td colspan="2"></td>
+              <td class="text-right">₹ ${pageTotalSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
             </tr>
 
             <!-- Final Page Only: OVERALL GRAND TOTAL -->
@@ -1511,9 +1661,9 @@ export const generateParticularsListPrintHtml = (particulars: any[], dateRangeTe
             <tr class="grand-total-row">
               <td colspan="5" class="text-right" style="padding-right:8px;">OVERALL GRAND TOTAL (${particulars.length} Bills):</td>
               <td class="text-center">${overallCasesSum}</td>
-              <td class="text-right">â‚¹ ${overallSubtotalSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-              <td colspan="3"></td>
-              <td class="text-right">â‚¹ ${overallTotalSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+              <td class="text-right">₹ ${overallSubtotalSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+              <td colspan="2"></td>
+              <td class="text-right">₹ ${overallTotalSum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
             </tr>`
                 : ''
             }
