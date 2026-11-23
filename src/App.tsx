@@ -205,6 +205,7 @@ function App() {
                 />
               ) : (
                 <CustomersPage
+                  currentUser={currentUser}
                   onAddNew={() => handleSetCustomerSubView('add')}
                   onSelectCustomerForParticular={handleCustomerSelectedForParticular}
                 />

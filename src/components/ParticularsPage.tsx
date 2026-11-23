@@ -190,7 +190,6 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
 
   // Live Dropdown options
   const [customerOptions, setCustomerOptions] = useState<{ id: string; name: string; address?: string; gst?: string; mobile?: string }[]>([]);
-  const [companyOptions, setCompanyOptions] = useState<{ id: string; name: string; address?: string; gstin?: string; phone?: string }[]>([]);
   const [productOptions, setProductOptions] = useState<{ id: string; name: string; code?: string; rate?: number; pktUnit?: string }[]>([]);
 
   // Persistent Selected Customer for Creation & Filter
@@ -198,24 +197,35 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   const [currentCustomerName, setCurrentCustomerName] = useState<string>(() => {
     return initialCustomerName || '';
   });
-  const [filterCustomer, setFilterCustomer] = useState<string>(() => {
-    return initialCustomerName || '';
+
+  // Independent Filter state for Account Details and Particular Details (Default to ALL)
+  const [accountFilterCustomer, setAccountFilterCustomer] = useState<string>(() => {
+    return initialSubTab === 'Account Details' && initialCustomerName && initialCustomerName !== 'ALL'
+      ? initialCustomerName
+      : 'ALL';
+  });
+  const [particularFilterCustomer, setParticularFilterCustomer] = useState<string>(() => {
+    return initialSubTab === 'Particular Details' && initialCustomerName && initialCustomerName !== 'ALL'
+      ? initialCustomerName
+      : 'ALL';
   });
 
   const [accountCustomerInput, setAccountCustomerInput] = useState<string>(() => {
-    return initialCustomerName && initialCustomerName !== 'ALL' ? initialCustomerName : 'All Customers';
+    return accountFilterCustomer && accountFilterCustomer !== 'ALL' ? accountFilterCustomer : 'All Customers';
   });
   const [particularCustomerInput, setParticularCustomerInput] = useState<string>(() => {
-    return initialCustomerName && initialCustomerName !== 'ALL' ? initialCustomerName : 'All Customers';
+    return particularFilterCustomer && particularFilterCustomer !== 'ALL' ? particularFilterCustomer : 'All Customers';
   });
 
   useEffect(() => {
-    const name = filterCustomer && filterCustomer !== 'ALL'
-      ? filterCustomer
-      : (currentCustomerName && currentCustomerName !== 'ALL' ? currentCustomerName : 'All Customers');
+    const name = accountFilterCustomer && accountFilterCustomer !== 'ALL' ? accountFilterCustomer : 'All Customers';
     setAccountCustomerInput(name);
+  }, [accountFilterCustomer]);
+
+  useEffect(() => {
+    const name = particularFilterCustomer && particularFilterCustomer !== 'ALL' ? particularFilterCustomer : 'All Customers';
     setParticularCustomerInput(name);
-  }, [filterCustomer, currentCustomerName]);
+  }, [particularFilterCustomer]);
 
   // Subtab 2: Create Particular Form State
   const [caseCount, setCaseCount] = useState<string>('0');
@@ -225,6 +235,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   const [companyPhone, setCompanyPhone] = useState<string>(() => localStorage.getItem('dheeksha_particular_comp_phone') || '');
   const [customerAddress, setCustomerAddress] = useState<string>(() => localStorage.getItem('dheeksha_particular_cust_addr') || '');
   const [customerPhone, setCustomerPhone] = useState<string>(() => localStorage.getItem('dheeksha_particular_cust_phone') || '');
+  const [customerGst, setCustomerGst] = useState<string>(() => localStorage.getItem('dheeksha_particular_cust_gst') || '');
   const [discount, setDiscount] = useState<string>('');
   const [billNo, setBillNo] = useState<string>('');
   const [tax, setTax] = useState<string>('');
@@ -345,7 +356,11 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   useEffect(() => {
     if (initialCustomerName) {
       setCurrentCustomerName(initialCustomerName);
-      setFilterCustomer(initialCustomerName);
+      if (initialSubTab === 'Account Details') {
+        setAccountFilterCustomer(initialCustomerName);
+      } else if (initialSubTab === 'Particular Details') {
+        setParticularFilterCustomer(initialCustomerName);
+      }
       setAddCreditCustomerName(initialCustomerName);
       const match = customerOptions.find((c) => c.name === initialCustomerName);
       if (match) {
@@ -356,16 +371,19 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         if (match.mobile) {
           setCustomerPhone(match.mobile);
         }
+        if (match.gst) {
+          setCustomerGst(match.gst);
+        }
       }
     } else {
       setCurrentCustomerName('');
-      setFilterCustomer('');
       setAddCreditCustomerName('');
       setSelectedCustomerId('');
       setCustomerAddress('');
       setCustomerPhone('');
+      setCustomerGst('');
     }
-  }, [initialCustomerName, customerOptions]);
+  }, [initialCustomerName, customerOptions, initialSubTab]);
 
   // Update subtab when prop changes
   useEffect(() => {
@@ -407,12 +425,14 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
             if (existing) {
               setSelectedCustomerId(existing.id);
               setAddCreditCustomerName(existing.name);
-              setFilterCustomer(existing.name);
               if (existing.address) {
                 setCustomerAddress(existing.address);
               }
               if (existing.mobile) {
                 setCustomerPhone(existing.mobile);
+              }
+              if (existing.gst) {
+                setCustomerGst(existing.gst);
               }
             }
           }
@@ -426,7 +446,6 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
             gstin: c.gstin || c.gst || '',
             phone: c.phone || c.mobile || '',
           }));
-          setCompanyOptions(mapped);
 
           const savedComp = localStorage.getItem('dheeksha_particular_company');
           if (savedComp) {
@@ -470,7 +489,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   const fetchAccounts = async (targetCustomer?: string) => {
     try {
       setAccountLoading(true);
-      const cust = targetCustomer !== undefined ? targetCustomer : (filterCustomer || currentCustomerName);
+      const cust = targetCustomer !== undefined ? targetCustomer : accountFilterCustomer;
       const data = await AccountsApi.getAll(cust && cust !== 'ALL' ? cust : undefined);
       const sorted = (data || []).slice().sort((a: any, b: any) => {
         const timeA = parseDateToTimestamp(a.date) || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
@@ -492,7 +511,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   const fetchParticulars = async (targetCustomer?: string) => {
     try {
       setParticularLoading(true);
-      const cust = targetCustomer !== undefined ? targetCustomer : (filterCustomer || currentCustomerName);
+      const cust = targetCustomer !== undefined ? targetCustomer : particularFilterCustomer;
       const data = await ParticularsApi.getAll(cust && cust !== 'ALL' ? cust : undefined);
       const sorted = (data || []).slice().sort((a: any, b: any) => {
         const timeA = parseDateToTimestamp(a.date) || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
@@ -534,13 +553,12 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   }, [particularDetails]);
 
   useEffect(() => {
-    const custToFetch = filterCustomer || currentCustomerName;
     if (activeSubTab === 'Account Details') {
-      fetchAccounts(custToFetch);
+      fetchAccounts(accountFilterCustomer);
     } else if (activeSubTab === 'Particular Details') {
-      fetchParticulars(custToFetch);
+      fetchParticulars(particularFilterCustomer);
     }
-  }, [activeSubTab, filterCustomer, currentCustomerName]);
+  }, [activeSubTab, accountFilterCustomer, particularFilterCustomer]);
 
   // Overall totals
   const overallTotals = useMemo(() => {
@@ -674,11 +692,15 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   // Subtab 2: Submit Particular Bill
   const handleCreateParticular = async () => {
     if (!billNo || !billNo.trim()) {
-      alert('Please enter a Bill Number');
+      alert('Please enter a Bill Number (Mandatory)');
       return;
     }
-    if (!currentCustomerName) {
+    if (!currentCustomerName || !currentCustomerName.trim()) {
       alert('Please select a Customer');
+      return;
+    }
+    if (!customerPhone || !customerPhone.trim()) {
+      alert('Please enter Customer Mobile / Phone Number (Mandatory)');
       return;
     }
     if (productRows.length === 0) {
@@ -734,7 +756,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         customerName: currentCustomerName || 'General',
         customerAddress: resolvedAddress,
         customerPhone: customerPhone.trim(),
-        customerGst: targetCustomer?.gst || '',
+        customerGst: customerGst.trim() || targetCustomer?.gst || '',
         caseCount: caseCount || '0',
         companyName: company.trim() || 'BUSSY BEE',
         companyAddress: companyAddress.trim(),
@@ -766,7 +788,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         billNo: assignedBillNo,
         customerName: currentCustomerName || 'General',
         customerAddress: resolvedAddress,
-        customerGst: targetCustomer?.gst || '',
+        customerGst: customerGst.trim() || targetCustomer?.gst || '',
         customerMobile: customerPhone.trim() || targetCustomer?.mobile || '+91 98765 43210',
         customerPhone: customerPhone.trim() || targetCustomer?.mobile || '',
         companyName: company.trim() || 'BUSSY BEE',
@@ -809,8 +831,9 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
       setCaseCount('0');
       setDiscount('');
       setTax('');
-      fetchAccounts(filterCustomer);
-      fetchParticulars();
+      fetchAccounts(accountFilterCustomer);
+      fetchParticulars('ALL');
+      setParticularFilterCustomer('ALL');
 
       setActiveSubTab('Particular Details');
 
@@ -850,8 +873,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
       setCreditNotes('Additional customer payment');
       
       // Refresh all financial states
-      fetchAccounts(filterCustomer);
-      fetchParticulars();
+      fetchAccounts(accountFilterCustomer);
+      fetchParticulars(particularFilterCustomer);
       setActiveSubTab('Account Details');
     } catch (err: any) {
       console.error('Failed to add credit:', err);
@@ -878,8 +901,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
           })
         );
       }
-      fetchAccounts(filterCustomer);
-      fetchParticulars();
+      fetchAccounts(accountFilterCustomer);
+      fetchParticulars(particularFilterCustomer);
     } catch (err) {
       console.error('Failed to delete account entry:', err);
     }
@@ -902,8 +925,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
           return true;
         })
       );
-      fetchAccounts(filterCustomer);
-      fetchParticulars();
+      fetchAccounts(accountFilterCustomer);
+      fetchParticulars(particularFilterCustomer);
     } catch (err) {
       console.error('Failed to delete particular bill:', err);
     }
@@ -1007,7 +1030,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
 
   const handleShareParticularsListWhatsApp = async () => {
     try {
-      const cust = filterCustomer || currentCustomerName || 'All Customers';
+      const cust = particularFilterCustomer && particularFilterCustomer !== 'ALL' ? particularFilterCustomer : 'All Customers';
       await shareParticularsListOnWhatsApp(cust, sortedParticularDetails);
     } catch (err) {
       console.error('Failed to share particulars on WhatsApp:', err);
@@ -1016,7 +1039,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
 
   const handleShareLedgerWhatsApp = async () => {
     try {
-      const cust = filterCustomer || currentCustomerName || 'All Customers';
+      const cust = accountFilterCustomer && accountFilterCustomer !== 'ALL' ? accountFilterCustomer : 'All Customers';
       await shareLedgerOnWhatsApp(cust, sortedAccountDetails);
     } catch (err) {
       console.error('Failed to share ledger on WhatsApp:', err);
@@ -1139,8 +1162,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         products: editBillForm.products,
       });
 
-      await fetchParticulars();
-      await fetchAccounts(filterCustomer);
+      await fetchParticulars(particularFilterCustomer);
+      await fetchAccounts(accountFilterCustomer);
       setOpenEditParticularModal(false);
       setPdfToast({
         open: true,
@@ -1445,19 +1468,25 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     if (val) {
                       setSelectedCustomerId(val.id);
                       setCurrentCustomerName(val.name);
-                      setFilterCustomer(val.name);
                       setAddCreditCustomerName(val.name);
                       setCustomerAddress(val.address || '');
                       setCustomerPhone(val.mobile || '');
+                      setCustomerGst(val.gst || '');
                       localStorage.setItem('dheeksha_active_customer', val.name);
+                      if (val.address) localStorage.setItem('dheeksha_particular_cust_addr', val.address);
+                      if (val.mobile) localStorage.setItem('dheeksha_particular_cust_phone', val.mobile);
+                      if (val.gst) localStorage.setItem('dheeksha_particular_cust_gst', val.gst);
                     } else {
                       setSelectedCustomerId('');
                       setCurrentCustomerName('');
-                      setFilterCustomer('');
                       setAddCreditCustomerName('');
                       setCustomerAddress('');
                       setCustomerPhone('');
+                      setCustomerGst('');
                       localStorage.removeItem('dheeksha_active_customer');
+                      localStorage.removeItem('dheeksha_particular_cust_addr');
+                      localStorage.removeItem('dheeksha_particular_cust_phone');
+                      localStorage.removeItem('dheeksha_particular_cust_gst');
                     }
                   }}
                   renderInput={(params) => (
@@ -1556,424 +1585,246 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   letterSpacing: '-0.01em',
                 }}
               >
-                Create Particular - {company ? `${company} → ` : ''}{currentCustomerName || 'Customer'}
+                Create Particular - Customer
               </Typography>
             </Box>
 
-            <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-              {/* Block 1: From Details (Company / Billing Info) */}
+            <Box sx={{ p: 2.5 }}>
               <Box
                 sx={{
-                  backgroundColor: '#F8FAFC',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '6px',
-                  p: 2,
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: '#0B4DB7',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    mb: 1.5,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                  }}
-                >
-                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#0B4DB7' }} />
-                  From Details (Company / Billing Information)
-                </Typography>
-
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: '1.2fr 1fr', md: '1.4fr 1fr 1.2fr 1fr' },
-                    gap: 2,
-                  }}
-                >
-                  <Box>
-                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                      Company Name *
-                    </Typography>
-                    <Autocomplete
-                      freeSolo
-                      size="small"
-                      options={companyOptions}
-                      getOptionLabel={(option) => (typeof option === 'string' ? option : option.name || '')}
-                      isOptionEqualToValue={(option, val) => {
-                        const optStr = typeof option === 'string' ? option : option?.name || '';
-                        const valStr = typeof val === 'string' ? val : val?.name || '';
-                        return optStr.toLowerCase() === valStr.toLowerCase();
-                      }}
-                      value={companyOptions.find((c) => c.name.toLowerCase() === (company || '').toLowerCase()) || company || null}
-                      onChange={(_, val) => {
-                        if (typeof val === 'string') {
-                          setCompany(val);
-                          localStorage.setItem('dheeksha_particular_company', val);
-                          localStorage.setItem('dheeksha_trader_name', val);
-                        } else if (val) {
-                          setCompany(val.name);
-                          setCompanyAddress(val.address || '');
-                          setCompanyGst(val.gstin || '');
-                          setCompanyPhone(val.phone || '');
-                          localStorage.setItem('dheeksha_particular_company', val.name);
-                          localStorage.setItem('dheeksha_particular_comp_addr', val.address || '');
-                          localStorage.setItem('dheeksha_particular_comp_gst', val.gstin || '');
-                          localStorage.setItem('dheeksha_particular_comp_phone', val.phone || '');
-                          localStorage.setItem('dheeksha_trader_name', val.name);
-                          localStorage.setItem('dheeksha_trader_address', val.address || '');
-                          localStorage.setItem('dheeksha_trader_gst', val.gstin || '');
-                          localStorage.setItem('dheeksha_trader_phone', val.phone || '');
-                        } else {
-                          setCompany('');
-                          setCompanyAddress('');
-                          setCompanyGst('');
-                          setCompanyPhone('');
-                          localStorage.removeItem('dheeksha_particular_company');
-                          localStorage.removeItem('dheeksha_particular_comp_addr');
-                          localStorage.removeItem('dheeksha_particular_comp_gst');
-                          localStorage.removeItem('dheeksha_particular_comp_phone');
-                          localStorage.removeItem('dheeksha_trader_name');
-                          localStorage.setItem('dheeksha_trader_address', '');
-                          localStorage.setItem('dheeksha_trader_gst', '');
-                          localStorage.setItem('dheeksha_trader_phone', '');
-                        }
-                      }}
-                      onInputChange={(_, newInputValue) => {
-                        setCompany(newInputValue);
-                        localStorage.setItem('dheeksha_particular_company', newInputValue);
-                        localStorage.setItem('dheeksha_trader_name', newInputValue);
-                      }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          placeholder="Select or enter Company Name"
-                          sx={{
-                            backgroundColor: '#FFFFFF',
-                            borderRadius: '6px',
-                            '& .MuiOutlinedInput-root': {
-                              height: '36px',
-                              borderRadius: '6px',
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              color: '#0F172A',
-                              '& fieldset': { borderColor: '#CBD5E1' },
-                              '&:hover fieldset': { borderColor: '#94A3B8' },
-                              '&.Mui-focused fieldset': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
-                            },
-                          }}
-                        />
-                      )}
-                    />
-                  </Box>
-
-                  <Box>
-                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                      Company Phone
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="Company Phone"
-                      value={companyPhone}
-                      onChange={(e) => {
-                        setCompanyPhone(e.target.value);
-                        localStorage.setItem('dheeksha_particular_comp_phone', e.target.value);
-                        localStorage.setItem('dheeksha_trader_phone', e.target.value);
-                      }}
-                      slotProps={{
-                        input: {
-                          sx: {
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            height: '36px',
-                            backgroundColor: '#FFFFFF',
-                            borderRadius: '6px',
-                            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
-                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
-                          },
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <Box>
-                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                      GST / GSTIN
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="GSTIN (e.g. 33AAAAA0000A1Z5)"
-                      value={companyGst}
-                      onChange={(e) => {
-                        setCompanyGst(e.target.value);
-                        localStorage.setItem('dheeksha_particular_comp_gst', e.target.value);
-                        localStorage.setItem('dheeksha_trader_gst', e.target.value);
-                      }}
-                      slotProps={{
-                        input: {
-                          sx: {
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            height: '36px',
-                            backgroundColor: '#FFFFFF',
-                            borderRadius: '6px',
-                            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
-                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
-                          },
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <Box>
-                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                      Company Address
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="City, State, Pincode"
-                      value={companyAddress}
-                      onChange={(e) => {
-                        setCompanyAddress(e.target.value);
-                        localStorage.setItem('dheeksha_particular_comp_addr', e.target.value);
-                        localStorage.setItem('dheeksha_trader_address', e.target.value);
-                      }}
-                      slotProps={{
-                        input: {
-                          sx: {
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            height: '36px',
-                            backgroundColor: '#FFFFFF',
-                            borderRadius: '6px',
-                            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
-                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
-                          },
-                        },
-                      }}
-                    />
-                  </Box>
-                </Box>
-              </Box>
-
-              {/* Block 2: To Details (Customer & Bill Info) */}
-              <Box
-                sx={{
-                  backgroundColor: '#FFFFFF',
-                  border: '1px solid #E2E8F0',
-                  borderRadius: '6px',
-                  p: 2,
-                  display: 'flex',
-                  flexDirection: 'column',
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: '1.2fr 1fr 1.4fr', md: '1.2fr 1fr 1.4fr' },
                   gap: 2,
                 }}
               >
-                <Typography
-                  sx={{
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    color: '#0B4DB7',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                  }}
-                >
-                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#0B4DB7' }} />
-                  To Details (Customer & Bill Information)
-                </Typography>
-
-                {/* Row 1: Customer, Phone Number, and Address */}
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1.2fr 1fr 1.5fr' }, gap: 2 }}>
-                  <Box>
-                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                      Customer *
-                    </Typography>
-                    <Autocomplete
-                      fullWidth
-                      size="small"
-                      autoHighlight
-                      options={customerOptions}
-                      getOptionLabel={(option) => (typeof option === 'string' ? option : option.name || '')}
-                      isOptionEqualToValue={(option, val) => option.id === val.id || option.name === val.name}
-                      value={customerOptions.find((c) => c.name === currentCustomerName) || null}
-                      onChange={(_, val) => {
-                        const name = val ? val.name : '';
-                        setCurrentCustomerName(name);
-                        localStorage.setItem('dheeksha_active_customer', name);
-                        if (val) {
-                          setSelectedCustomerId(val.id);
-                          setFilterCustomer(val.name);
-                          setAddCreditCustomerName(val.name);
-                          setCustomerAddress(val.address || '');
-                          setCustomerPhone(val.mobile || '');
-                          if (val.address) localStorage.setItem('dheeksha_particular_cust_addr', val.address);
-                          if (val.mobile) localStorage.setItem('dheeksha_particular_cust_phone', val.mobile);
-                        } else {
-                          setSelectedCustomerId('');
-                          setCustomerAddress('');
-                          setCustomerPhone('');
-                          localStorage.removeItem('dheeksha_particular_cust_addr');
-                          localStorage.removeItem('dheeksha_particular_cust_phone');
-                        }
-                      }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          placeholder="Search Customer..."
-                          sx={{
-                            backgroundColor: '#FFFFFF',
+                {/* 1. Customer */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    Customer *
+                  </Typography>
+                  <Autocomplete
+                    fullWidth
+                    size="small"
+                    autoHighlight
+                    options={customerOptions}
+                    getOptionLabel={(option) => (typeof option === 'string' ? option : option.name || '')}
+                    isOptionEqualToValue={(option, val) => option.id === val.id || option.name === val.name}
+                    value={customerOptions.find((c) => c.name === currentCustomerName) || null}
+                    onChange={(_, val) => {
+                      const name = val ? val.name : '';
+                      setCurrentCustomerName(name);
+                      localStorage.setItem('dheeksha_active_customer', name);
+                      if (val) {
+                        setSelectedCustomerId(val.id);
+                        setAddCreditCustomerName(val.name);
+                        setCustomerAddress(val.address || '');
+                        setCustomerPhone(val.mobile || '');
+                        setCustomerGst(val.gst || '');
+                        if (val.address) localStorage.setItem('dheeksha_particular_cust_addr', val.address);
+                        if (val.mobile) localStorage.setItem('dheeksha_particular_cust_phone', val.mobile);
+                        if (val.gst) localStorage.setItem('dheeksha_particular_cust_gst', val.gst);
+                      } else {
+                        setSelectedCustomerId('');
+                        setCustomerAddress('');
+                        setCustomerPhone('');
+                        setCustomerGst('');
+                        localStorage.removeItem('dheeksha_particular_cust_addr');
+                        localStorage.removeItem('dheeksha_particular_cust_phone');
+                        localStorage.removeItem('dheeksha_particular_cust_gst');
+                      }
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        placeholder="Search Customer..."
+                        sx={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '6px',
+                          '& .MuiOutlinedInput-root': {
+                            height: '36px',
                             borderRadius: '6px',
-                            '& .MuiOutlinedInput-root': {
-                              height: '36px',
-                              borderRadius: '6px',
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              color: '#0F172A',
-                              '& fieldset': {
-                                borderColor: '#CBD5E1',
-                              },
-                              '&:hover fieldset': {
-                                borderColor: '#94A3B8',
-                              },
-                              '&.Mui-focused fieldset': {
-                                borderColor: '#0B4DB7',
-                                borderWidth: '1.5px',
-                              },
-                            },
-                          }}
-                        />
-                      )}
-                    />
-                  </Box>
-
-                  <Box>
-                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                      Phone Number
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="Customer Phone / Mobile"
-                      value={customerPhone}
-                      onChange={(e) => {
-                        setCustomerPhone(e.target.value);
-                        localStorage.setItem('dheeksha_particular_cust_phone', e.target.value);
-                      }}
-                      slotProps={{
-                        input: {
-                          sx: {
                             fontSize: '13px',
                             fontWeight: 600,
-                            height: '36px',
-                            backgroundColor: customerPhone ? '#F0FDF4' : '#FFFFFF',
                             color: '#0F172A',
-                            borderRadius: '6px',
-                            '& .MuiOutlinedInput-notchedOutline': {
-                              borderColor: customerPhone ? '#86EFAC' : '#CBD5E1',
-                            },
-                            '&:hover .MuiOutlinedInput-notchedOutline': {
-                              borderColor: '#94A3B8',
-                            },
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                              borderColor: '#0B4DB7',
-                              borderWidth: '1.5px',
-                            },
-                          },
-                        },
-                      }}
-                    />
-                  </Box>
-
-                  <Box>
-                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                      Address (City, State, Pincode)
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="City, State, Pincode"
-                      value={customerAddress}
-                      onChange={(e) => {
-                        setCustomerAddress(e.target.value);
-                        localStorage.setItem('dheeksha_particular_cust_addr', e.target.value);
-                      }}
-                      slotProps={{
-                        input: {
-                          sx: {
-                            fontSize: '13px',
-                            fontWeight: 500,
-                            height: '36px',
-                            backgroundColor: '#FFFFFF',
-                            borderRadius: '6px',
-                            '& .MuiOutlinedInput-notchedOutline': {
+                            '& fieldset': {
                               borderColor: '#CBD5E1',
                             },
-                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                            '&:hover fieldset': {
                               borderColor: '#94A3B8',
                             },
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            '&.Mui-focused fieldset': {
                               borderColor: '#0B4DB7',
                               borderWidth: '1.5px',
                             },
                           },
-                        },
-                      }}
-                    />
-                  </Box>
+                        }}
+                      />
+                    )}
+                  />
                 </Box>
 
-                {/* Row 2: Bill No and Date */}
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-                  <Box>
-                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                      Bill No *
-                    </Typography>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="Enter Bill No (e.g. 101)"
-                      value={billNo}
-                      onChange={(e) => setBillNo(e.target.value)}
-                      slotProps={{
-                        input: {
-                          sx: {
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            height: '36px',
-                            backgroundColor: '#FFFFFF',
-                            borderRadius: '6px',
-                            '& .MuiOutlinedInput-notchedOutline': {
-                              borderColor: '#CBD5E1',
-                            },
+                {/* 2. Mobile Number * */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    Mobile Number <span style={{ color: '#DC2626' }}>*</span>
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Customer Mobile Number"
+                    value={customerPhone}
+                    onChange={(e) => {
+                      setCustomerPhone(e.target.value);
+                      localStorage.setItem('dheeksha_particular_cust_phone', e.target.value);
+                    }}
+                    slotProps={{
+                      input: {
+                        sx: {
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          height: '36px',
+                          backgroundColor: '#FFFFFF',
+                          color: '#0F172A',
+                          borderRadius: '6px',
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#CBD5E1',
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#94A3B8',
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#0B4DB7',
+                            borderWidth: '1.5px',
                           },
                         },
-                      }}
-                    />
-                  </Box>
+                      },
+                    }}
+                  />
+                </Box>
 
-                  <Box>
-                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                      Date
-                    </Typography>
-                    <DatePickerField
-                      value={date}
-                      onChange={setDate}
-                      placeholder="dd-mm-yyyy"
-                      iconSize={16}
-                      inputSx={{ height: '36px' }}
-                    />
-                  </Box>
+                {/* 3. Address (City, State, Pincode) */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    Address (City, State, Pincode)
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="City, State, Pincode"
+                    value={customerAddress}
+                    onChange={(e) => {
+                      setCustomerAddress(e.target.value);
+                      localStorage.setItem('dheeksha_particular_cust_addr', e.target.value);
+                    }}
+                    slotProps={{
+                      input: {
+                        sx: {
+                          fontSize: '13px',
+                          fontWeight: 500,
+                          height: '36px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '6px',
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#CBD5E1',
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#94A3B8',
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#0B4DB7',
+                            borderWidth: '1.5px',
+                          },
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+
+                {/* 4. GST Number (Optional) */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    GST Number (Optional)
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="GSTIN (e.g. 33AAAAA0000A1Z5)"
+                    value={customerGst}
+                    onChange={(e) => {
+                      setCustomerGst(e.target.value);
+                      localStorage.setItem('dheeksha_particular_cust_gst', e.target.value);
+                    }}
+                    slotProps={{
+                      input: {
+                        sx: {
+                          fontSize: '13px',
+                          fontWeight: 500,
+                          height: '36px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '6px',
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#CBD5E1',
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#94A3B8',
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#0B4DB7',
+                            borderWidth: '1.5px',
+                          },
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+
+                {/* 5. Bill No * */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    Bill No <span style={{ color: '#DC2626' }}>*</span>
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Enter Bill No (e.g. 101)"
+                    value={billNo}
+                    onChange={(e) => setBillNo(e.target.value)}
+                    slotProps={{
+                      input: {
+                        sx: {
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          height: '36px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '6px',
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#CBD5E1',
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#94A3B8',
+                          },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                            borderColor: '#0B4DB7',
+                            borderWidth: '1.5px',
+                          },
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+
+                {/* 6. Date */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    Date
+                  </Typography>
+                  <DatePickerField
+                    value={date}
+                    onChange={setDate}
+                    placeholder="dd-mm-yyyy"
+                    iconSize={16}
+                    inputSx={{ height: '36px' }}
+                  />
                 </Box>
               </Box>
             </Box>
@@ -2675,7 +2526,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
               </Table>
             </TableContainer>
 
-            {/* Below Products Table: Discount (%), Tax (₹), and Overall Grand Total */}
+            {/* Below Products Table: Discount, Tax, Amount, Total & Click to Create */}
             <Box
               sx={{
                 p: { xs: 2, sm: 2.5 },
@@ -2686,15 +2537,15 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 gap: 2,
               }}
             >
-              {/* Row: Discount (%) and Tax (₹) Input Fields */}
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '220px 220px 1fr' },
+                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1.2fr 1.2fr 1.1fr 1.2fr 1.4fr' },
                   gap: 2,
-                  alignItems: 'flex-start',
+                  alignItems: 'flex-end',
                 }}
               >
+                {/* Discount (%) */}
                 <Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                     <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}>
@@ -2717,25 +2568,19 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                         sx: {
                           fontSize: '13px',
                           fontWeight: 600,
-                          height: '36px',
+                          height: '38px',
                           backgroundColor: '#FFFFFF',
                           borderRadius: '6px',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#CBD5E1',
-                          },
-                          '&:hover .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#94A3B8',
-                          },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#0B4DB7',
-                            borderWidth: '1.5px',
-                          },
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
                         },
                       },
                     }}
                   />
                 </Box>
 
+                {/* Tax (₹) */}
                 <Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                     <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}>
@@ -2758,155 +2603,92 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                         sx: {
                           fontSize: '13px',
                           fontWeight: 600,
-                          height: '36px',
+                          height: '38px',
                           backgroundColor: '#FFFFFF',
                           borderRadius: '6px',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#CBD5E1',
-                          },
-                          '&:hover .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#94A3B8',
-                          },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#0B4DB7',
-                            borderWidth: '1.5px',
-                          },
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
                         },
                       },
                     }}
                   />
                 </Box>
-              </Box>
 
-              {/* Bottom Summary Bar: Subtotal, Discount, Tax, Overall Grand Total & Action Button */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  pt: 2,
-                  borderTop: '1px solid #E2E8F0',
-                  gap: 2,
-                }}
-              >
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: { xs: 1.5, sm: 2.5 } }}>
-                  {/* Subtotal */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
-                      Subtotal Amount:
-                    </Typography>
-                    <Box
-                      sx={{
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: '6px',
-                        px: 1.6,
-                        py: 0.5,
-                        fontSize: '13.5px',
-                        fontWeight: 700,
-                        color: '#0F172A',
-                        minWidth: '90px',
-                        textAlign: 'right',
-                        border: '1px solid #CBD5E1',
-                      }}
-                    >
-                      ₹{subtotalAmount.toFixed(2)}
-                    </Box>
-                  </Box>
-
-                  {/* Discount Deduction Badge */}
-                  {discountVal > 0 && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#DC2626' }}>
-                        Discount:
-                      </Typography>
-                      <Box
-                        sx={{
-                          backgroundColor: '#FEF2F2',
-                          borderRadius: '6px',
-                          px: 1.4,
-                          py: 0.5,
-                          fontSize: '13px',
-                          fontWeight: 700,
-                          color: '#DC2626',
-                          border: '1px solid #FECACA',
-                        }}
-                      >
-                        -₹{discountVal.toFixed(2)}
-                      </Box>
-                    </Box>
-                  )}
-
-                  {/* Tax Addition Badge */}
-                  {taxVal > 0 && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#16A34A' }}>
-                        Tax:
-                      </Typography>
-                      <Box
-                        sx={{
-                          backgroundColor: '#F0FDF4',
-                          borderRadius: '6px',
-                          px: 1.4,
-                          py: 0.5,
-                          fontSize: '13px',
-                          fontWeight: 700,
-                          color: '#16A34A',
-                          border: '1px solid #BBF7D0',
-                        }}
-                      >
-                        +₹{taxVal.toFixed(2)}
-                      </Box>
-                    </Box>
-                  )}
-
-                  {/* Overall Grand Total Badge */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                    <Typography sx={{ fontSize: '13.5px', fontWeight: 800, color: '#0F172A' }}>
-                      Overall Grand Total:
-                    </Typography>
-                    <Box
-                      sx={{
-                        backgroundColor: '#0B4DB7',
-                        color: '#FFFFFF',
-                        borderRadius: '6px',
-                        px: 2.2,
-                        py: 0.7,
-                        fontSize: '16px',
-                        fontWeight: 900,
-                        letterSpacing: '0.01em',
-                        minWidth: '120px',
-                        textAlign: 'right',
-                        boxShadow: '0 2px 5px rgba(11, 77, 183, 0.25)',
-                      }}
-                    >
-                      ₹{finalTotalAmount}
-                    </Box>
+                {/* Amount */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    Amount
+                  </Typography>
+                  <Box
+                    sx={{
+                      height: '38px',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      color: '#0F172A',
+                      px: 1.5,
+                    }}
+                  >
+                    ₹{subtotalAmount.toFixed(2)}
                   </Box>
                 </Box>
 
-                <Button
-                  variant="contained"
-                  disableElevation
-                  onClick={handleCreateParticular}
-                  disabled={createLoading}
-                  sx={{
-                    backgroundColor: '#0284C7',
-                    color: '#FFFFFF',
-                    height: '40px',
-                    px: 3.5,
-                    fontSize: '13.5px',
-                    fontWeight: 700,
-                    textTransform: 'none',
-                    borderRadius: '6px',
-                    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
-                    '&:hover': {
-                      backgroundColor: '#0369A1',
-                    },
-                  }}
-                >
-                  {createLoading ? 'Creating...' : 'Click to Create Particular'}
-                </Button>
+                {/* Total */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    Total
+                  </Typography>
+                  <Box
+                    sx={{
+                      height: '38px',
+                      backgroundColor: '#EFF6FF',
+                      border: '1.5px solid #3B82F6',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '14.5px',
+                      fontWeight: 800,
+                      color: '#1D4ED8',
+                      px: 1.5,
+                    }}
+                  >
+                    ₹{finalTotalAmount}
+                  </Box>
+                </Box>
+
+                {/* Click to Create Button */}
+                <Box>
+                  <Button
+                    variant="contained"
+                    disableElevation
+                    fullWidth
+                    onClick={handleCreateParticular}
+                    disabled={createLoading}
+                    sx={{
+                      backgroundColor: '#0284C7',
+                      color: '#FFFFFF',
+                      height: '38px',
+                      px: 2.5,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      borderRadius: '6px',
+                      boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
+                      '&:hover': {
+                        backgroundColor: '#0369A1',
+                      },
+                    }}
+                  >
+                    {createLoading ? 'Creating...' : 'Click to Create'}
+                  </Button>
+                </Box>
               </Box>
             </Box>
           </Paper>
@@ -2916,128 +2698,130 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
       {/* View 3: Account Details View */}
       {activeSubTab === 'Account Details' && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {/* Top Metric Cards */}
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
-              gap: 2,
-            }}
-          >
-            <Paper
-              elevation={0}
+          {/* Top Metric Cards (Super Admin only) */}
+          {isSuperAdmin && (
+            <Box
               sx={{
-                p: 2.2,
-                borderRadius: '10px',
-                border: '1px solid #E2E8F0',
-                backgroundColor: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
                 gap: 2,
               }}
             >
-              <Box
+              <Paper
+                elevation={0}
                 sx={{
-                  width: 44,
-                  height: 44,
+                  p: 2.2,
                   borderRadius: '10px',
-                  backgroundColor: '#FEF2F2',
-                  color: '#DC2626',
+                  border: '1px solid #E2E8F0',
+                  backgroundColor: '#FFFFFF',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  gap: 2,
                 }}
               >
-                <ReceiptLongRoundedIcon sx={{ fontSize: 24 }} />
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
-                  Total Purchases (Debit)
-                </Typography>
-                <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#DC2626' }}>
-                  ₹{overallTotals.totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </Typography>
-              </Box>
-            </Paper>
-
-            <Paper
-              elevation={0}
-              sx={{
-                p: 2.2,
-                borderRadius: '10px',
-                border: '1px solid #E2E8F0',
-                backgroundColor: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-              }}
-            >
-              <Box
-                sx={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: '10px',
-                  backgroundColor: '#F0FDF4',
-                  color: '#16A34A',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <AccountBalanceWalletRoundedIcon sx={{ fontSize: 24 }} />
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
-                  Total Paid / Credits
-                </Typography>
-                <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#16A34A' }}>
-                  ₹{overallTotals.totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </Typography>
-              </Box>
-            </Paper>
-
-            <Paper
-              elevation={0}
-              sx={{
-                p: 2.2,
-                borderRadius: '10px',
-                border: '1px solid #E2E8F0',
-                backgroundColor: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-              }}
-            >
-              <Box
-                sx={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: '10px',
-                  backgroundColor: overallTotals.netBalance < 0 ? '#FEF2F2' : '#F0FDF4',
-                  color: overallTotals.netBalance < 0 ? '#DC2626' : '#16A34A',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <AccountBalanceWalletRoundedIcon sx={{ fontSize: 24 }} />
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
-                  Net Outstanding Balance
-                </Typography>
-                <Typography
+                <Box
                   sx={{
-                    fontSize: '18px',
-                    fontWeight: 800,
-                    color: overallTotals.netBalance < 0 ? '#DC2626' : '#16A34A',
+                    width: 44,
+                    height: 44,
+                    borderRadius: '10px',
+                    backgroundColor: '#FEF2F2',
+                    color: '#DC2626',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  ₹{overallTotals.netBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </Typography>
-              </Box>
-            </Paper>
-          </Box>
+                  <ReceiptLongRoundedIcon sx={{ fontSize: 24 }} />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
+                    Total Purchases (Debit)
+                  </Typography>
+                  <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#DC2626' }}>
+                    ₹{overallTotals.totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </Typography>
+                </Box>
+              </Paper>
+
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.2,
+                  borderRadius: '10px',
+                  border: '1px solid #E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: '10px',
+                    backgroundColor: '#F0FDF4',
+                    color: '#16A34A',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <AccountBalanceWalletRoundedIcon sx={{ fontSize: 24 }} />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
+                    Total Paid / Credits
+                  </Typography>
+                  <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#16A34A' }}>
+                    ₹{overallTotals.totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </Typography>
+                </Box>
+              </Paper>
+
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.2,
+                  borderRadius: '10px',
+                  border: '1px solid #E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: '10px',
+                    backgroundColor: overallTotals.netBalance < 0 ? '#FEF2F2' : '#F0FDF4',
+                    color: overallTotals.netBalance < 0 ? '#DC2626' : '#16A34A',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <AccountBalanceWalletRoundedIcon sx={{ fontSize: 24 }} />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
+                    Net Outstanding Balance
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontSize: '18px',
+                      fontWeight: 800,
+                      color: overallTotals.netBalance < 0 ? '#DC2626' : '#16A34A',
+                    }}
+                  >
+                    ₹{overallTotals.netBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </Typography>
+                </Box>
+              </Paper>
+            </Box>
+          )}
 
           {/* Account Details Table */}
           <Paper
@@ -3071,7 +2855,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   letterSpacing: '-0.01em',
                 }}
               >
-                Account Details {filterCustomer && filterCustomer !== 'ALL' ? `- ${filterCustomer}` : (currentCustomerName ? `- ${currentCustomerName}` : '(All Customers)')}
+                Account Details {accountFilterCustomer && accountFilterCustomer !== 'ALL' ? `- ${accountFilterCustomer}` : '(All Customers)'}
               </Typography>
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
@@ -3081,23 +2865,29 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   autoHighlight
                   options={[{ id: 'ALL', name: 'All Customers' }, ...customerOptions]}
                   getOptionLabel={(option) => (typeof option === 'string' ? option : option.name || '')}
-                  isOptionEqualToValue={(option, val) => option.name === val.name}
+                  isOptionEqualToValue={(option, val) => {
+                    const optName = typeof option === 'string' ? option : option.name;
+                    const valName = typeof val === 'string' ? val : val.name;
+                    return optName === valName;
+                  }}
                   value={
-                    filterCustomer && filterCustomer !== 'ALL'
-                      ? customerOptions.find((c) => c.name === filterCustomer) || { id: filterCustomer, name: filterCustomer }
-                      : (currentCustomerName && currentCustomerName !== 'ALL' ? customerOptions.find((c) => c.name === currentCustomerName) || { id: 'ALL', name: 'All Customers' } : { id: 'ALL', name: 'All Customers' })
+                    accountFilterCustomer && accountFilterCustomer !== 'ALL'
+                      ? customerOptions.find((c) => c.name === accountFilterCustomer) || { id: accountFilterCustomer, name: accountFilterCustomer }
+                      : { id: 'ALL', name: 'All Customers' }
                   }
                   inputValue={accountCustomerInput}
                   onInputChange={(_, newInputValue, reason) => {
                     if (reason === 'input') {
                       setAccountCustomerInput(newInputValue);
                     } else if (reason === 'reset') {
-                      const curName = filterCustomer && filterCustomer !== 'ALL'
-                        ? filterCustomer
-                        : (currentCustomerName && currentCustomerName !== 'ALL' ? currentCustomerName : 'All Customers');
+                      const curName = accountFilterCustomer && accountFilterCustomer !== 'ALL'
+                        ? accountFilterCustomer
+                        : 'All Customers';
                       setAccountCustomerInput(newInputValue || curName);
                     } else if (reason === 'clear') {
                       setAccountCustomerInput('');
+                      setAccountFilterCustomer('ALL');
+                      fetchAccounts('ALL');
                     }
                   }}
                   filterOptions={(options, state) => {
@@ -3112,12 +2902,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   }}
                   onChange={(_, val) => {
                     const selectedName = val ? (val.id === 'ALL' ? 'ALL' : val.name) : 'ALL';
-                    setFilterCustomer(selectedName);
-                    if (val && val.id !== 'ALL') {
-                      setCurrentCustomerName(val.name);
-                      setSelectedCustomerId(val.id);
-                      localStorage.setItem('dheeksha_active_customer', val.name);
-                    }
+                    setAccountFilterCustomer(selectedName);
                     fetchAccounts(selectedName);
                   }}
                   sx={{ width: 220 }}
@@ -3220,9 +3005,11 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     <TableCell align="right" sx={{ py: 1.5, px: { xs: 1.5, sm: 2.5 }, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', width: '110px' }}>
                       DEBIT
                     </TableCell>
-                    <TableCell align="right" sx={{ py: 1.5, px: { xs: 1.5, sm: 2.5 }, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', width: '110px' }}>
-                      CREDIT
-                    </TableCell>
+                    {isSuperAdmin && (
+                      <TableCell align="right" sx={{ py: 1.5, px: { xs: 1.5, sm: 2.5 }, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', width: '110px' }}>
+                        CREDIT
+                      </TableCell>
+                    )}
                     <TableCell align="right" sx={{ py: 1.5, px: { xs: 1.5, sm: 2.5 }, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', width: '120px' }}>
                       BALANCE
                     </TableCell>
@@ -3234,14 +3021,14 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 <TableBody>
                   {accountLoading ? (
                     <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={isSuperAdmin ? 9 : 8} align="center" sx={{ py: 6 }}>
                         <CircularProgress size={32} sx={{ color: '#0B4DB7' }} />
                       </TableCell>
                     </TableRow>
                   ) : sortedAccountDetails.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ py: 6, color: '#64748B' }}>
-                        No account details found {filterCustomer && filterCustomer !== 'ALL' ? `for ${filterCustomer}` : ''}.
+                      <TableCell colSpan={isSuperAdmin ? 9 : 8} align="center" sx={{ py: 6, color: '#64748B' }}>
+                        No account details found {accountFilterCustomer && accountFilterCustomer !== 'ALL' ? `for ${accountFilterCustomer}` : ''}.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -3313,9 +3100,11 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                           <TableCell align="right" sx={{ py: 1.6, px: { xs: 1.5, sm: 2.5 }, fontSize: '13.5px', fontWeight: 500, color: '#DC2626', borderBottom: isLast ? 'none' : '1px solid #EEF2F6' }}>
                             {row.debit}
                           </TableCell>
-                          <TableCell align="right" sx={{ py: 1.6, px: { xs: 1.5, sm: 2.5 }, fontSize: '13.5px', fontWeight: 600, color: '#16A34A', borderBottom: isLast ? 'none' : '1px solid #EEF2F6' }}>
-                            {row.credit}
-                          </TableCell>
+                          {isSuperAdmin && (
+                            <TableCell align="right" sx={{ py: 1.6, px: { xs: 1.5, sm: 2.5 }, fontSize: '13.5px', fontWeight: 600, color: '#16A34A', borderBottom: isLast ? 'none' : '1px solid #EEF2F6' }}>
+                              {row.credit}
+                            </TableCell>
+                          )}
                           <TableCell
                             align="right"
                             sx={{
@@ -3397,7 +3186,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 letterSpacing: '-0.01em',
               }}
             >
-              Particular Details {filterCustomer && filterCustomer !== 'ALL' ? `- ${filterCustomer}` : (currentCustomerName ? `- ${currentCustomerName}` : '(All Bills)')}
+              Particular Details {particularFilterCustomer && particularFilterCustomer !== 'ALL' ? `- ${particularFilterCustomer}` : '(All Customers)'}
             </Typography>
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
@@ -3407,23 +3196,29 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 autoHighlight
                 options={[{ id: 'ALL', name: 'All Customers' }, ...customerOptions]}
                 getOptionLabel={(option) => (typeof option === 'string' ? option : option.name || '')}
-                isOptionEqualToValue={(option, val) => option.name === val.name}
+                isOptionEqualToValue={(option, val) => {
+                  const optName = typeof option === 'string' ? option : option.name;
+                  const valName = typeof val === 'string' ? val : val.name;
+                  return optName === valName;
+                }}
                 value={
-                  filterCustomer && filterCustomer !== 'ALL'
-                    ? customerOptions.find((c) => c.name === filterCustomer) || { id: filterCustomer, name: filterCustomer }
-                    : (currentCustomerName && currentCustomerName !== 'ALL' ? customerOptions.find((c) => c.name === currentCustomerName) || { id: 'ALL', name: 'All Customers' } : { id: 'ALL', name: 'All Customers' })
+                  particularFilterCustomer && particularFilterCustomer !== 'ALL'
+                    ? customerOptions.find((c) => c.name === particularFilterCustomer) || { id: particularFilterCustomer, name: particularFilterCustomer }
+                    : { id: 'ALL', name: 'All Customers' }
                 }
                 inputValue={particularCustomerInput}
                 onInputChange={(_, newInputValue, reason) => {
                   if (reason === 'input') {
                     setParticularCustomerInput(newInputValue);
                   } else if (reason === 'reset') {
-                    const curName = filterCustomer && filterCustomer !== 'ALL'
-                      ? filterCustomer
-                      : (currentCustomerName && currentCustomerName !== 'ALL' ? currentCustomerName : 'All Customers');
+                    const curName = particularFilterCustomer && particularFilterCustomer !== 'ALL'
+                      ? particularFilterCustomer
+                      : 'All Customers';
                     setParticularCustomerInput(newInputValue || curName);
                   } else if (reason === 'clear') {
                     setParticularCustomerInput('');
+                    setParticularFilterCustomer('ALL');
+                    fetchParticulars('ALL');
                   }
                 }}
                 filterOptions={(options, state) => {
@@ -3438,12 +3233,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 }}
                 onChange={(_, val) => {
                   const selectedName = val ? (val.id === 'ALL' ? 'ALL' : val.name) : 'ALL';
-                  setFilterCustomer(selectedName);
-                  if (val && val.id !== 'ALL') {
-                    setCurrentCustomerName(val.name);
-                    setSelectedCustomerId(val.id);
-                    localStorage.setItem('dheeksha_active_customer', val.name);
-                  }
+                  setParticularFilterCustomer(selectedName);
                   fetchParticulars(selectedName);
                 }}
                 sx={{ width: 220 }}
@@ -3575,7 +3365,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 ) : sortedParticularDetails.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} align="center" sx={{ py: 6, color: '#64748B' }}>
-                      No particular bills found {filterCustomer !== 'ALL' ? `for ${filterCustomer}` : ''}.
+                      No particular bills found {particularFilterCustomer && particularFilterCustomer !== 'ALL' ? `for ${particularFilterCustomer}` : ''}.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -4226,13 +4016,13 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
       <DateRangePrintModal
         open={openAccountDateModal}
         onClose={() => setOpenAccountDateModal(false)}
-        title={`Print Account Statement - ${filterCustomer || currentCustomerName || 'All Customers'}`}
+        title={`Print Account Statement - ${accountFilterCustomer && accountFilterCustomer !== 'ALL' ? accountFilterCustomer : 'All Customers'}`}
         subtitle="Select transaction date range to filter ledger entries for A4 print."
         items={sortedAccountDetails}
         getDateFromItem={(a) => a.date || ''}
         onConfirmPrint={(itemsToPrint, rangeText) => {
           printLedgerStatementDirectly(
-            filterCustomer || currentCustomerName || 'All Customers',
+            accountFilterCustomer && accountFilterCustomer !== 'ALL' ? accountFilterCustomer : 'All Customers',
             itemsToPrint,
             rangeText
           );
@@ -4243,7 +4033,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
       <DateRangePrintModal
         open={openParticularDateModal}
         onClose={() => setOpenParticularDateModal(false)}
-        title="Print Particulars Bills Master Report"
+        title={`Print Particulars Bills Master Report - ${particularFilterCustomer && particularFilterCustomer !== 'ALL' ? particularFilterCustomer : 'All Customers'}`}
         subtitle="Select bill date range to filter bills for A4 print."
         items={sortedParticularDetails}
         getDateFromItem={(p) => p.date || ''}
