@@ -1603,9 +1603,11 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                       size="small"
                       options={companyOptions}
                       getOptionLabel={(option) => (typeof option === 'string' ? option : option.name || '')}
-                      isOptionEqualToValue={(option, val) =>
-                        typeof val === 'string' ? option.name === val : option.id === val.id || option.name === val.name
-                      }
+                      isOptionEqualToValue={(option, val) => {
+                        const optStr = typeof option === 'string' ? option : option?.name || '';
+                        const valStr = typeof val === 'string' ? val : val?.name || '';
+                        return optStr.toLowerCase() === valStr.toLowerCase();
+                      }}
                       value={companyOptions.find((c) => c.name.toLowerCase() === (company || '').toLowerCase()) || company || null}
                       onChange={(_, val) => {
                         if (typeof val === 'string') {
@@ -2028,11 +2030,11 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 sx={{ flex: { xs: '1 1 100%', sm: 2.3 }, minWidth: '150px' }}
                 options={productOptions}
                 getOptionLabel={(option) => (typeof option === 'string' ? option : option.name || '')}
-                isOptionEqualToValue={(option, val) =>
-                  typeof val === 'string'
-                    ? option.name === val
-                    : option.id === val.id || option.name === val.name
-                }
+                isOptionEqualToValue={(option, val) => {
+                  const optStr = typeof option === 'string' ? option : option?.name || '';
+                  const valStr = typeof val === 'string' ? val : val?.name || '';
+                  return optStr.toLowerCase() === valStr.toLowerCase();
+                }}
                 value={selectedProduct}
                 onChange={(_, val) => {
                   if (typeof val === 'string') {
