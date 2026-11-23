@@ -173,6 +173,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   // Live Dropdown options
   const [customerOptions, setCustomerOptions] = useState<{ id: string; name: string; address?: string; gst?: string; mobile?: string }[]>([]);
   const [companyOptions, setCompanyOptions] = useState<{ id: string; name: string }[]>([]);
+  void companyOptions;
   const [productOptions, setProductOptions] = useState<{ id: string; name: string; code?: string; rate?: number; pktUnit?: string }[]>([]);
 
   // Persistent Selected Customer for Creation & Filter
@@ -1036,16 +1037,6 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
     return dStr.includes('%') || dNum <= 100 ? (editSubtotal * dNum) / 100 : dNum;
   }, [editSubtotal, editBillForm.discount]);
 
-  const editPackingVal = useMemo(() => {
-    const pStr = String(editBillForm.packing || '').trim();
-    if (!pStr) return 0;
-    const cleanPack = pStr.replace(/[^0-9.]/g, '');
-    const pNum = parseFloat(cleanPack) || 0;
-    if (pNum <= 0) return 0;
-    const baseAfterDiscount = Math.max(0, editSubtotal - editDiscountVal);
-    return pStr.includes('%') || pNum <= 100 ? (baseAfterDiscount * pNum) / 100 : pNum;
-  }, [editSubtotal, editDiscountVal, editBillForm.packing]);
-
   const editTaxVal = useMemo(() => {
     const tStr = String(editBillForm.tax || '').trim();
     if (!tStr) return 0;
@@ -1056,9 +1047,9 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   }, [editBillForm.tax]);
 
   const editFinalTotal = useMemo(() => {
-    const net = Math.max(0, editSubtotal - editDiscountVal + editPackingVal + editTaxVal);
+    const net = Math.max(0, editSubtotal - editDiscountVal + editTaxVal);
     return net.toFixed(2);
-  }, [editSubtotal, editDiscountVal, editPackingVal, editTaxVal]);
+  }, [editSubtotal, editDiscountVal, editTaxVal]);
 
   const handleSaveEditParticular = async () => {
     if (!editingParticularId) return;
@@ -1066,12 +1057,12 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
       setEditBillLoading(true);
       await ParticularsApi.update(editingParticularId, {
         customerName: editBillForm.customerName,
-        companyName: editBillForm.companyName,
+        companyName: '',
         date: editBillForm.date,
-        transport: editBillForm.transport || '-',
+        transport: '-',
         caseCount: editBillForm.caseCount || '0',
         discount: editBillForm.discount || '0',
-        packing: editBillForm.packing || '0',
+        packing: '0',
         tax: editBillForm.tax || '0',
         billNo: editBillForm.billNo,
         amount: editSubtotal.toFixed(2),
@@ -3849,7 +3840,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
 
         <DialogContent sx={{ pt: 2.5 }}>
           {/* Bill Info Grid */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1.2fr 1.2fr 1fr' }, gap: 2, mb: 2.5 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' }, gap: 2, mb: 2.5 }}>
             <Box>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
                 Bill No *
@@ -3886,25 +3877,6 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
 
             <Box>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                Company Name
-              </Typography>
-              <Autocomplete
-                freeSolo
-                options={companyOptions.map((c) => c.name)}
-                value={editBillForm.companyName}
-                onInputChange={(_e, newVal) => setEditBillForm((prev) => ({ ...prev, companyName: newVal }))}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    size="small"
-                    placeholder="Company Name"
-                  />
-                )}
-              />
-            </Box>
-
-            <Box>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
                 Date (DD-MM-YYYY)
               </Typography>
               <DatePickerField
@@ -3913,21 +3885,6 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 placeholder="DD-MM-YYYY"
                 iconSize={16}
                 inputSx={{ fontSize: '13px', fontWeight: 600 }}
-              />
-            </Box>
-
-            <Box>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                Transport Name
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={editBillForm.transport}
-                onChange={(e) => setEditBillForm((prev) => ({ ...prev, transport: e.target.value }))}
-                slotProps={{
-                  input: { sx: { fontSize: '13px', fontWeight: 500, borderRadius: '6px' } },
-                }}
               />
             </Box>
 
@@ -3955,21 +3912,6 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 size="small"
                 value={editBillForm.discount}
                 onChange={(e) => setEditBillForm((prev) => ({ ...prev, discount: e.target.value }))}
-                slotProps={{
-                  input: { sx: { fontSize: '13px', fontWeight: 500, borderRadius: '6px' } },
-                }}
-              />
-            </Box>
-
-            <Box>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                Packing (% or ₹)
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={editBillForm.packing}
-                onChange={(e) => setEditBillForm((prev) => ({ ...prev, packing: e.target.value }))}
                 slotProps={{
                   input: { sx: { fontSize: '13px', fontWeight: 500, borderRadius: '6px' } },
                 }}
@@ -4129,12 +4071,6 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 <div>
                   <span style={{ color: '#DC2626' }}>Discount: </span>
                   <strong style={{ color: '#DC2626' }}>- ₹ {editDiscountVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
-                </div>
-              )}
-              {editPackingVal > 0 && (
-                <div>
-                  <span style={{ color: '#64748B' }}>Packing: </span>
-                  <strong>+ ₹ {editPackingVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
                 </div>
               )}
               {editTaxVal > 0 && (
