@@ -243,7 +243,7 @@ export const getCustomerById = async (req: Request, res: Response, next: NextFun
 
 export const createCustomer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { name, mobile, address, gst, idCode } = req.body;
+    const { name, mobile, address, gst, idCode, avatarLetter, avatarBg, avatarColor } = req.body;
 
     const finalIdCode = await getNextCustomerIdCode(idCode);
 
@@ -253,6 +253,9 @@ export const createCustomer = async (req: Request, res: Response, next: NextFunc
       address,
       gst,
       idCode: finalIdCode,
+      avatarLetter: avatarLetter || (name ? name.trim().charAt(0).toUpperCase() : ''),
+      avatarBg: avatarBg || '#DBEAFE',
+      avatarColor: avatarColor || '#0B4DB7',
     });
     res.status(201).json({ success: true, data: customer });
   } catch (error) {

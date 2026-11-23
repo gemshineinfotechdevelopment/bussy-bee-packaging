@@ -56,9 +56,10 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
       if (onSubmitSuccess) {
         onSubmitSuccess();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to create customer:', err);
-      alert('Error creating customer. Please check your backend connection.');
+      const msg = err?.message || 'Please check your backend connection.';
+      alert(`Error creating customer: ${msg}`);
     } finally {
       setLoading(false);
     }
