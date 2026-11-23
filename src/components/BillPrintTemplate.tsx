@@ -14,12 +14,17 @@ export interface BillPrintData {
   date: string;
   customerName: string;
   customerAddress?: string;
+  customerPhone?: string;
   customerGst?: string;
   customerMobile?: string;
   traderName?: string;
   traderAddress?: string;
   traderGst?: string;
+  traderPhone?: string;
   companyName: string;
+  companyAddress?: string;
+  companyGst?: string;
+  companyPhone?: string;
   preparedBy?: string;
   phone?: string;
   email?: string;
@@ -39,7 +44,7 @@ export interface BillPrintData {
 
 interface BillPrintTemplateProps {
   bill: BillPrintData;
-  onUpdateTraderInfo?: (info: { traderName: string; traderAddress: string; traderGst: string }) => void;
+  onUpdateTraderInfo?: (info: { traderName: string; traderAddress: string; traderGst: string; traderPhone?: string }) => void;
 }
 
 /**
@@ -105,44 +110,46 @@ export function numberToWords(amount: number): string {
 
 export const BillPrintTemplate: React.FC<BillPrintTemplateProps> = ({ bill, onUpdateTraderInfo }) => {
   const [traderName, setTraderName] = React.useState<string>(() => {
-    if (bill.traderName && bill.traderName !== 'BUSSY BEE TRADERS') return bill.traderName;
-    const stored = localStorage.getItem('dheeksha_trader_name');
-    if (stored && stored !== 'BUSSY BEE TRADERS') return stored;
-    return '';
+    return bill.companyName || bill.traderName || localStorage.getItem('dheeksha_trader_name') || 'BUSSY BEE';
   });
   const [traderAddress, setTraderAddress] = React.useState<string>(() => {
-    if (bill.traderAddress && bill.traderAddress !== 'Main Road, Sivakasi - 626123, Tamil Nadu') return bill.traderAddress;
-    const stored = localStorage.getItem('dheeksha_trader_address');
-    if (stored && stored !== 'Main Road, Sivakasi - 626123, Tamil Nadu') return stored;
-    return '';
+    return bill.companyAddress || bill.traderAddress || localStorage.getItem('dheeksha_trader_address') || '';
   });
   const [traderGst, setTraderGst] = React.useState<string>(() => {
-    if (bill.traderGst && bill.traderGst !== 'GSTIN: 33AAAAA0000A1Z5 | State: Tamil Nadu (33)') return bill.traderGst;
-    const stored = localStorage.getItem('dheeksha_trader_gst');
-    if (stored && stored !== 'GSTIN: 33AAAAA0000A1Z5 | State: Tamil Nadu (33)') return stored;
-    return '';
+    return bill.companyGst || bill.traderGst || localStorage.getItem('dheeksha_trader_gst') || '';
+  });
+  const [traderPhone, setTraderPhone] = React.useState<string>(() => {
+    return bill.companyPhone || bill.traderPhone || (bill.phone && bill.phone !== bill.customerMobile ? bill.phone : '') || localStorage.getItem('dheeksha_trader_phone') || '';
   });
 
   React.useEffect(() => {
-    if (bill.traderName !== undefined) setTraderName(bill.traderName !== 'BUSSY BEE TRADERS' ? bill.traderName : '');
-    if (bill.traderAddress !== undefined) setTraderAddress(bill.traderAddress !== 'Main Road, Sivakasi - 626123, Tamil Nadu' ? bill.traderAddress : '');
-    if (bill.traderGst !== undefined) setTraderGst(bill.traderGst !== 'GSTIN: 33AAAAA0000A1Z5 | State: Tamil Nadu (33)' ? bill.traderGst : '');
-  }, [bill.traderName, bill.traderAddress, bill.traderGst]);
+    if (bill.companyName || bill.traderName) setTraderName(bill.companyName || bill.traderName || 'BUSSY BEE');
+    if (bill.companyAddress || bill.traderAddress) setTraderAddress(bill.companyAddress || bill.traderAddress || '');
+    if (bill.companyGst || bill.traderGst) setTraderGst(bill.companyGst || bill.traderGst || '');
+    if (bill.companyPhone || bill.traderPhone || (bill.phone && bill.phone !== bill.customerMobile)) {
+      setTraderPhone(bill.companyPhone || bill.traderPhone || (bill.phone && bill.phone !== bill.customerMobile ? bill.phone : '') || '');
+    }
+  }, [bill.companyName, bill.companyAddress, bill.companyGst, bill.companyPhone, bill.traderName, bill.traderAddress, bill.traderGst, bill.traderPhone, bill.phone, bill.customerMobile]);
 
   const handleNameChange = (val: string) => {
     setTraderName(val);
     localStorage.setItem('dheeksha_trader_name', val);
-    onUpdateTraderInfo?.({ traderName: val, traderAddress, traderGst });
+    onUpdateTraderInfo?.({ traderName: val, traderAddress, traderGst, traderPhone });
   };
   const handleAddrChange = (val: string) => {
     setTraderAddress(val);
     localStorage.setItem('dheeksha_trader_address', val);
-    onUpdateTraderInfo?.({ traderName, traderAddress: val, traderGst });
+    onUpdateTraderInfo?.({ traderName, traderAddress: val, traderGst, traderPhone });
   };
   const handleGstChange = (val: string) => {
     setTraderGst(val);
     localStorage.setItem('dheeksha_trader_gst', val);
-    onUpdateTraderInfo?.({ traderName, traderAddress, traderGst: val });
+    onUpdateTraderInfo?.({ traderName, traderAddress, traderGst: val, traderPhone });
+  };
+  const handlePhoneChange = (val: string) => {
+    setTraderPhone(val);
+    localStorage.setItem('dheeksha_trader_phone', val);
+    onUpdateTraderInfo?.({ traderName, traderAddress, traderGst, traderPhone: val });
   };
   // Calculate Subtotal from Products or bill.amount
   const prodSubtotal = (bill.products || []).reduce((acc, p) => {
@@ -278,41 +285,28 @@ export const BillPrintTemplate: React.FC<BillPrintTemplateProps> = ({ bill, onUp
     >
       {/* Top Header */}
       <div style={{ textAlign: 'center', borderBottom: '2px solid #0F172A', paddingBottom: '10px', marginBottom: '12px' }}>
-        <h1
+        <input
+          type="text"
+          value={traderName}
+          onChange={(e) => handleNameChange(e.target.value)}
+          placeholder="Company Name"
+          title="Company Name"
           style={{
-            fontSize: '26px',
+            fontSize: '24px',
             fontWeight: 900,
             color: '#0B4DB7',
-            margin: '0 0 2px 0',
+            margin: '0 0 4px 0',
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
+            textAlign: 'center',
+            border: '1px dashed transparent',
+            backgroundColor: 'transparent',
+            outline: 'none',
+            width: '100%',
+            fontFamily: 'inherit',
           }}
-        >
-          BUSSY BEE
-        </h1>
-        <div style={{ maxWidth: '440px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          <input
-            type="text"
-            value={traderName}
-            onChange={(e) => handleNameChange(e.target.value)}
-            placeholder="Name"
-            title="Name"
-            style={{
-              textAlign: 'center',
-              fontSize: '13.5px',
-              fontWeight: 800,
-              color: '#0F172A',
-              textTransform: 'uppercase',
-              letterSpacing: '0.03em',
-              border: '1px dashed #CBD5E1',
-              backgroundColor: '#FAFAFA',
-              padding: '3px 8px',
-              borderRadius: '4px',
-              outline: 'none',
-              width: '100%',
-              boxSizing: 'border-box',
-            }}
-          />
+        />
+        <div style={{ maxWidth: '520px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '3px' }}>
           <input
             type="text"
             value={traderAddress}
@@ -333,28 +327,50 @@ export const BillPrintTemplate: React.FC<BillPrintTemplateProps> = ({ bill, onUp
               boxSizing: 'border-box',
             }}
           />
-          <input
-            type="text"
-            value={traderGst}
-            onChange={(e) => handleGstChange(e.target.value)}
-            placeholder="GST"
-            title="GST"
-            style={{
-              textAlign: 'center',
-              fontSize: '11px',
-              fontWeight: 700,
-              color: '#1E293B',
-              border: '1px dashed #CBD5E1',
-              backgroundColor: '#FAFAFA',
-              padding: '3px 8px',
-              borderRadius: '4px',
-              outline: 'none',
-              width: '100%',
-              boxSizing: 'border-box',
-            }}
-          />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="text"
+              value={traderGst}
+              onChange={(e) => handleGstChange(e.target.value)}
+              placeholder="GSTIN"
+              title="GSTIN"
+              style={{
+                flex: 1,
+                textAlign: 'center',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#1E293B',
+                border: '1px dashed #CBD5E1',
+                backgroundColor: '#FAFAFA',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            <input
+              type="text"
+              value={traderPhone}
+              onChange={(e) => handlePhoneChange(e.target.value)}
+              placeholder="Phone Number"
+              title="Phone Number"
+              style={{
+                flex: 1,
+                textAlign: 'center',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#1E293B',
+                border: '1px dashed #CBD5E1',
+                backgroundColor: '#FAFAFA',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
         </div>
-        <div>
+        <div style={{ marginTop: '6px' }}>
           <span
             style={{
               backgroundColor: '#0F172A',

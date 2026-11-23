@@ -122,12 +122,14 @@ export const generateBillHtml = (bill: BillPrintData): string => {
     ? bill.caseCount
     : (bill.products || []).reduce((acc, p) => acc + (parseFloat(String(p.quantity)) || 0), 0);
 
-  const custAddr = bill.customerAddress && bill.customerAddress.trim() ? bill.customerAddress.trim() : 'Main Road, Sivakasi - 626123';
+  const custAddr = bill.customerAddress && bill.customerAddress.trim() ? bill.customerAddress.trim() : '';
   const custGst = bill.customerGst && bill.customerGst.trim() ? bill.customerGst.trim() : '-';
-  const custPhone = bill.customerMobile || bill.phone || '+91 98765 43210';
-  const traderName = bill.traderName && bill.traderName !== 'BUSSY BEE TRADERS' ? bill.traderName : '';
-  const traderAddress = bill.traderAddress && bill.traderAddress !== 'Main Road, Sivakasi - 626123, Tamil Nadu' ? bill.traderAddress : '';
-  const traderGst = bill.traderGst && bill.traderGst !== 'GSTIN: 33AAAAA0000A1Z5 | State: Tamil Nadu (33)' ? bill.traderGst : '';
+  const custPhone = bill.customerMobile || bill.customerPhone || bill.phone || '';
+
+  const fromCompanyName = (bill.traderName || bill.companyName || 'BUSSY BEE').trim();
+  const fromAddress = (bill.traderAddress || bill.companyAddress || '').trim();
+  const fromGst = (bill.traderGst || bill.companyGst || '').trim();
+  const fromPhone = (bill.companyPhone || bill.traderPhone || (bill.phone && bill.phone !== custPhone ? bill.phone : '') || '').trim();
 
   // Taxable Value & GST Calculation
   const totalTaxableValue = Math.max(0, subtotal - discountAmt);
@@ -437,10 +439,15 @@ export const generateBillHtml = (bill: BillPrintData): string => {
   <div class="bill-wrapper">
     <!-- Header -->
     <div class="top-header">
-      <div class="comp-name">BUSSY BEE</div>
-      ${traderName ? `<div class="comp-trader">${traderName}</div>` : ''}
-      ${traderAddress ? `<div class="comp-addr">${traderAddress}</div>` : ''}
-      ${traderGst ? `<div class="comp-gst">${traderGst}</div>` : ''}
+      <div class="comp-name">${fromCompanyName}</div>
+      ${fromAddress ? `<div class="comp-addr">${fromAddress}</div>` : ''}
+      ${(fromGst || fromPhone) ? `
+        <div class="comp-gst">
+          ${fromGst ? `<span>GSTIN: ${fromGst}</span>` : ''}
+          ${fromGst && fromPhone ? `<span style="color:#94A3B8; margin: 0 6px;">•</span>` : ''}
+          ${fromPhone ? `<span>Phone: ${fromPhone}</span>` : ''}
+        </div>
+      ` : ''}
       <div><span class="doc-type-badge">ESTIMATE</span></div>
     </div>
 
@@ -587,7 +594,7 @@ export const generateBillHtml = (bill: BillPrintData): string => {
         <div style="font-weight: 700; color:#334155;">Customer Signature</div>
       </div>
       <div class="sig-block">
-        <div style="font-weight: 800; color:#0F172A; margin-bottom: 22px;">For ${traderName || 'BUSSY BEE'}</div>
+        <div style="font-weight: 800; color:#0F172A; margin-bottom: 22px;">For ${fromCompanyName || 'BUSSY BEE'}</div>
         <div class="sig-line"></div>
         <div style="font-weight: 700; color:#334155;">Authorized Signatory</div>
       </div>

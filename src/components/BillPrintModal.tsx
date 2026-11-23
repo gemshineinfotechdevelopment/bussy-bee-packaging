@@ -25,25 +25,29 @@ interface BillPrintModalProps {
 export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, bill }) => {
   const [sharing, setSharing] = useState(false);
   const [customTrader, setCustomTrader] = useState(() => {
-    const storedName = localStorage.getItem('dheeksha_trader_name');
-    const storedAddr = localStorage.getItem('dheeksha_trader_address');
-    const storedGst = localStorage.getItem('dheeksha_trader_gst');
+    const storedName = localStorage.getItem('dheeksha_trader_name') || localStorage.getItem('dheeksha_particular_company') || '';
+    const storedAddr = localStorage.getItem('dheeksha_trader_address') || localStorage.getItem('dheeksha_particular_comp_addr') || '';
+    const storedGst = localStorage.getItem('dheeksha_trader_gst') || localStorage.getItem('dheeksha_particular_comp_gst') || '';
+    const storedPhone = localStorage.getItem('dheeksha_trader_phone') || localStorage.getItem('dheeksha_particular_comp_phone') || '';
     return {
-      traderName: storedName && storedName !== 'BUSSY BEE TRADERS' ? storedName : '',
-      traderAddress: storedAddr && storedAddr !== 'Main Road, Sivakasi - 626123, Tamil Nadu' ? storedAddr : '',
-      traderGst: storedGst && storedGst !== 'GSTIN: 33AAAAA0000A1Z5 | State: Tamil Nadu (33)' ? storedGst : '',
+      traderName: storedName,
+      traderAddress: storedAddr,
+      traderGst: storedGst,
+      traderPhone: storedPhone,
     };
   });
 
   React.useEffect(() => {
     if (bill) {
-      const storedName = localStorage.getItem('dheeksha_trader_name');
-      const storedAddr = localStorage.getItem('dheeksha_trader_address');
-      const storedGst = localStorage.getItem('dheeksha_trader_gst');
+      const name = bill.traderName || bill.companyName || localStorage.getItem('dheeksha_trader_name') || localStorage.getItem('dheeksha_particular_company') || 'BUSSY BEE';
+      const addr = bill.traderAddress || bill.companyAddress || localStorage.getItem('dheeksha_trader_address') || localStorage.getItem('dheeksha_particular_comp_addr') || '';
+      const gst = bill.traderGst || bill.companyGst || localStorage.getItem('dheeksha_trader_gst') || localStorage.getItem('dheeksha_particular_comp_gst') || '';
+      const phone = bill.companyPhone || bill.traderPhone || (bill.phone && bill.phone !== bill.customerMobile ? bill.phone : '') || localStorage.getItem('dheeksha_trader_phone') || localStorage.getItem('dheeksha_particular_comp_phone') || '';
       setCustomTrader({
-        traderName: bill.traderName && bill.traderName !== 'BUSSY BEE TRADERS' ? bill.traderName : (storedName && storedName !== 'BUSSY BEE TRADERS' ? storedName : ''),
-        traderAddress: bill.traderAddress && bill.traderAddress !== 'Main Road, Sivakasi - 626123, Tamil Nadu' ? bill.traderAddress : (storedAddr && storedAddr !== 'Main Road, Sivakasi - 626123, Tamil Nadu' ? storedAddr : ''),
-        traderGst: bill.traderGst && bill.traderGst !== 'GSTIN: 33AAAAA0000A1Z5 | State: Tamil Nadu (33)' ? bill.traderGst : (storedGst && storedGst !== 'GSTIN: 33AAAAA0000A1Z5 | State: Tamil Nadu (33)' ? storedGst : ''),
+        traderName: name,
+        traderAddress: addr,
+        traderGst: gst,
+        traderPhone: phone,
       });
     }
   }, [bill]);
@@ -52,25 +56,20 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
 
   const currentBillWithTrader: BillPrintData = {
     ...bill,
+    companyName: customTrader.traderName,
+    companyAddress: customTrader.traderAddress,
+    companyGst: customTrader.traderGst,
+    companyPhone: customTrader.traderPhone,
     traderName: customTrader.traderName,
     traderAddress: customTrader.traderAddress,
     traderGst: customTrader.traderGst,
+    traderPhone: customTrader.traderPhone,
   };
 
   const handleTriggerPrint = () => {
     const name = (customTrader.traderName || '').trim();
-    const address = (customTrader.traderAddress || '').trim();
-
-    if (!name && !address) {
-      alert('Name and Address are mandatory! Please fill in Name and Address before printing.');
-      return;
-    }
     if (!name) {
-      alert('Name is mandatory! Please enter Name before printing.');
-      return;
-    }
-    if (!address) {
-      alert('Address is mandatory! Please enter Address before printing.');
+      alert('Company Name is mandatory! Please enter Company Name before printing.');
       return;
     }
 
@@ -79,10 +78,8 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
 
   const handleShareWhatsApp = async () => {
     const name = (customTrader.traderName || '').trim();
-    const address = (customTrader.traderAddress || '').trim();
-
-    if (!name || !address) {
-      alert('Name and Address are mandatory! Please fill in Name and Address before sharing.');
+    if (!name) {
+      alert('Company Name is mandatory! Please enter Company Name before sharing.');
       return;
     }
 
@@ -242,7 +239,17 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
               maxWidth: '750px',
             }}
           >
-            <BillPrintTemplate bill={currentBillWithTrader} onUpdateTraderInfo={setCustomTrader} />
+            <BillPrintTemplate
+              bill={currentBillWithTrader}
+              onUpdateTraderInfo={(info) =>
+                setCustomTrader({
+                  traderName: info.traderName,
+                  traderAddress: info.traderAddress,
+                  traderGst: info.traderGst,
+                  traderPhone: info.traderPhone || '',
+                })
+              }
+            />
           </Box>
         </DialogContent>
 
