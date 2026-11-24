@@ -443,7 +443,7 @@ export const generateBillHtml = (bill: BillPrintData): string => {
       ${fromAddress ? `<div class="comp-addr">${fromAddress}</div>` : ''}
       ${(fromGst || fromPhone) ? `
         <div class="comp-gst">
-          ${fromGst ? `<span>GSTIN: ${fromGst}</span>` : ''}
+          ${fromGst ? `<span>${fromGst.toUpperCase().startsWith('GST') || fromGst.toUpperCase().startsWith('PAN') || fromGst.toUpperCase().startsWith('AADHAR') ? fromGst : `GST / PAN / AADHAR: ${fromGst}`}</span>` : ''}
           ${fromGst && fromPhone ? `<span style="color:#94A3B8; margin: 0 6px;">•</span>` : ''}
           ${fromPhone ? `<span>Phone: ${fromPhone}</span>` : ''}
         </div>

@@ -22,6 +22,7 @@ export interface IParticular extends Document {
   traderName?: string;
   traderAddress?: string;
   traderGst?: string;
+  traderPhone?: string;
   discount: string;
   transport: string;
   packing: string;
@@ -61,6 +62,7 @@ const ParticularSchema: Schema = new Schema(
     traderName: { type: String, default: '', trim: true },
     traderAddress: { type: String, default: '', trim: true },
     traderGst: { type: String, default: '', trim: true },
+    traderPhone: { type: String, default: '', trim: true },
     discount: { type: String, default: '' },
     transport: { type: String, default: '' },
     packing: { type: String, default: '' },

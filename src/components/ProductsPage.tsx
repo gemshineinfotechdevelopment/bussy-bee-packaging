@@ -152,8 +152,8 @@ export const ProductsPage: FC = () => {
             px: { xs: 2, sm: 3 },
             py: 1.5,
             display: 'flex',
-            flexDirection: { xs: 'column', sm: 'row' },
-            alignItems: { xs: 'stretch', sm: 'center' },
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: { xs: 'stretch', md: 'center' },
             justifyContent: 'space-between',
             gap: 1.5,
             minHeight: '56px',
@@ -188,9 +188,10 @@ export const ProductsPage: FC = () => {
           <Box
             sx={{
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: { xs: 'column', sm: 'row' },
+              alignItems: 'stretch',
               gap: 1.5,
-              flexWrap: { xs: 'wrap', sm: 'nowrap' },
+              width: { xs: '100%', md: 'auto' },
             }}
           >
             {/* Search Box */}
@@ -245,55 +246,69 @@ export const ProductsPage: FC = () => {
               )}
             </Box>
 
-            {/* Print Products List Button */}
-            <Button
-              variant="contained"
-              disableElevation
-              onClick={() => printProductsListDirectly(filteredProducts)}
-              startIcon={<PrintOutlinedIcon sx={{ fontSize: 18 }} />}
+            {/* Action Buttons Group */}
+            <Box
               sx={{
-                backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                color: '#FFFFFF',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                fontSize: '13px',
-                fontWeight: 700,
-                textTransform: 'none',
-                px: 1.8,
-                height: '36px',
-                borderRadius: '6px',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                },
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.2,
+                width: { xs: '100%', sm: 'auto' },
               }}
             >
-              Print List ({filteredProducts.length})
-            </Button>
+              {/* Print Products List Button */}
+              <Button
+                variant="contained"
+                disableElevation
+                onClick={() => printProductsListDirectly(filteredProducts)}
+                startIcon={<PrintOutlinedIcon sx={{ fontSize: 18 }} />}
+                sx={{
+                  flex: { xs: 1, sm: 'none' },
+                  minWidth: 0,
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  color: '#FFFFFF',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  fontSize: { xs: '12px', sm: '13px' },
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  px: { xs: 1.2, sm: 1.8 },
+                  height: '36px',
+                  borderRadius: '6px',
+                  whiteSpace: 'nowrap',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                  },
+                }}
+              >
+                Print List ({filteredProducts.length})
+              </Button>
 
-            {/* Add Product Button */}
-            <Button
-              variant="contained"
-              disableElevation
-              onClick={handleOpenAdd}
-              startIcon={<AddRoundedIcon sx={{ fontSize: 18 }} />}
-              sx={{
-                backgroundColor: '#FFFFFF',
-                color: '#0B4DB7',
-                fontSize: '13px',
-                fontWeight: 700,
-                textTransform: 'none',
-                px: 2,
-                height: '36px',
-                borderRadius: '6px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                minWidth: 'auto',
-                whiteSpace: 'nowrap',
-                '&:hover': {
-                  backgroundColor: '#F8FAFC',
-                },
-              }}
-            >
-              Add Product
-            </Button>
+              {/* Add Product Button */}
+              <Button
+                variant="contained"
+                disableElevation
+                onClick={handleOpenAdd}
+                startIcon={<AddRoundedIcon sx={{ fontSize: 18 }} />}
+                sx={{
+                  flex: { xs: 1, sm: 'none' },
+                  minWidth: 0,
+                  backgroundColor: '#FFFFFF',
+                  color: '#0B4DB7',
+                  fontSize: { xs: '12px', sm: '13px' },
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  px: { xs: 1.2, sm: 2 },
+                  height: '36px',
+                  borderRadius: '6px',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                  whiteSpace: 'nowrap',
+                  '&:hover': {
+                    backgroundColor: '#F8FAFC',
+                  },
+                }}
+              >
+                Add Product
+              </Button>
+            </Box>
           </Box>
         </Box>
 

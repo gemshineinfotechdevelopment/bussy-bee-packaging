@@ -22,6 +22,7 @@ import {
   DialogActions,
   Snackbar,
   Alert,
+  Divider,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
@@ -43,6 +44,7 @@ import {
   ProductsApi,
   ParticularsApi,
   AccountsApi,
+  SettingsApi,
 } from '../services/api';
 import { BillPrintModal } from './BillPrintModal';
 import type { BillPrintData } from './BillPrintTemplate';
@@ -229,11 +231,13 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
 
   // Subtab 2: Create Particular Form State
   const [caseCount, setCaseCount] = useState<string>('0');
-  const [company, setCompany] = useState<string>(() => localStorage.getItem('dheeksha_particular_company') || '');
-  const [companyAddress, setCompanyAddress] = useState<string>(() => localStorage.getItem('dheeksha_particular_comp_addr') || '');
-  const [companyGst, setCompanyGst] = useState<string>(() => localStorage.getItem('dheeksha_particular_comp_gst') || '');
-  const [companyPhone, setCompanyPhone] = useState<string>(() => localStorage.getItem('dheeksha_particular_comp_phone') || '');
+  const [company, setCompany] = useState<string>('BUSSY BEE');
+  const [companyAddress, setCompanyAddress] = useState<string>('');
+  const [companyGst, setCompanyGst] = useState<string>('');
+  const [companyPhone, setCompanyPhone] = useState<string>('');
   const [customerAddress, setCustomerAddress] = useState<string>(() => localStorage.getItem('dheeksha_particular_cust_addr') || '');
+  const [customerState, setCustomerState] = useState<string>(() => localStorage.getItem('dheeksha_particular_cust_state') || 'Tamil Nadu');
+  const [transportName, setTransportName] = useState<string>(() => localStorage.getItem('dheeksha_particular_transport') || '');
   const [customerPhone, setCustomerPhone] = useState<string>(() => localStorage.getItem('dheeksha_particular_cust_phone') || '');
   const [customerGst, setCustomerGst] = useState<string>(() => localStorage.getItem('dheeksha_particular_cust_gst') || '');
   const [discount, setDiscount] = useState<string>('');
@@ -243,6 +247,24 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
     const today = new Date();
     return today.toLocaleDateString('en-GB').replace(/\//g, '-');
   });
+
+  // Settings: Rate visibility for Admin
+  const [isRateEnabledForAdmin, setIsRateEnabledForAdmin] = useState<boolean>(true);
+  const isRateVisible = isSuperAdmin || isRateEnabledForAdmin;
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const s = await SettingsApi.getSettings();
+        if (s && typeof s.isRateEnabledForAdmin === 'boolean') {
+          setIsRateEnabledForAdmin(s.isRateEnabledForAdmin);
+        }
+      } catch (err) {
+        console.error('Failed to load settings in ParticularsPage:', err);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   // Product Entry Form State
   const [selectedProduct, setSelectedProduct] = useState<string>('');
@@ -585,21 +607,22 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
 
   // Subtab 2: Product Line Addition
   const handleAddProductRow = () => {
-    if (!selectedProduct || !quantity || !rate) {
-      alert('Please select Product, enter No. of Counts and Rate');
+    if (!selectedProduct || !quantity || (isRateVisible && !rate)) {
+      alert(isRateVisible ? 'Please select Product, enter No. of Counts and Rate' : 'Please select Product and enter No. of Counts');
       return;
     }
     const caseVal = parseFloat(quantity) || 0;
     const piecesPerCase = extractUnitMultiplier(pkt);
     const totalPieces = caseVal * piecesPerCase;
-    const lineAmt = (totalPieces * (parseFloat(rate) || 0)).toFixed(2);
+    const effectiveRate = isRateVisible ? (rate || '0') : (rate || '0');
+    const lineAmt = (totalPieces * (parseFloat(effectiveRate) || 0)).toFixed(2);
 
     const newRow: ProductRowItem = {
       id: Date.now().toString(),
       particular: selectedProduct.trim(),
       hsn: hsnCode.trim(),
       quantity,
-      rate,
+      rate: effectiveRate,
       pktUnit: pkt ? pkt : '-',
       amount: lineAmt,
     };
@@ -766,7 +789,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         traderAddress: companyAddress.trim(),
         traderGst: companyGst.trim(),
         discount: discount || '0',
-        transport: '-',
+        transport: transportName.trim() || '-',
         packing: '0',
         billNo: billNo.trim(),
         tax: tax || '0',
@@ -785,9 +808,12 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
 
       const assignedBillNo = created?.billNo || billNo.trim();
       const createdBillData: BillPrintData = {
+        id: created?._id || created?.id || '',
+        _id: created?._id || created?.id || '',
         billNo: assignedBillNo,
         customerName: currentCustomerName || 'General',
         customerAddress: resolvedAddress,
+        customerState: customerState.trim() || 'Tamil Nadu',
         customerGst: customerGst.trim() || targetCustomer?.gst || '',
         customerMobile: customerPhone.trim() || targetCustomer?.mobile || '+91 98765 43210',
         customerPhone: customerPhone.trim() || targetCustomer?.mobile || '',
@@ -803,7 +829,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         phone: companyPhone.trim() || customerPhone.trim() || '+91 98765 43210',
         email: 'info@bussybee.com',
         website: 'www.bussybee.com',
-        transport: '-',
+        transport: transportName.trim() || '-',
         caseCount: caseCount || '0',
         date: date,
         products: productRows.map((p) => ({
@@ -831,6 +857,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
       setCaseCount('0');
       setDiscount('');
       setTax('');
+      setTransportName('');
+      localStorage.removeItem('dheeksha_particular_transport');
       fetchAccounts(accountFilterCustomer);
       fetchParticulars('ALL');
       setParticularFilterCustomer('ALL');
@@ -936,12 +964,14 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
     const targetCustomer = customerOptions.find(
       (c) => c.name.toLowerCase() === (billData.customerName || currentCustomerName || '').toLowerCase()
     );
-    const compName = billData.companyName || billData.traderName || company || localStorage.getItem('dheeksha_particular_company') || 'BUSSY BEE';
-    const compAddr = billData.companyAddress || billData.traderAddress || companyAddress || localStorage.getItem('dheeksha_particular_comp_addr') || '';
-    const compGst = billData.companyGst || billData.traderGst || companyGst || localStorage.getItem('dheeksha_particular_comp_gst') || '';
-    const compPhone = billData.companyPhone || billData.traderPhone || companyPhone || localStorage.getItem('dheeksha_particular_comp_phone') || '';
+    const compName = 'BUSSY BEE';
+    const compAddr = billData.traderAddress || billData.companyAddress || '';
+    const compGst = billData.traderGst || billData.companyGst || '';
+    const compPhone = billData.traderPhone || billData.companyPhone || '';
 
     const formattedBill: BillPrintData = {
+      id: billData._id || billData.id || '',
+      _id: billData._id || billData.id || '',
       billNo: billData.billNo || '',
       date: billData.date || '',
       customerName: billData.customerName || currentCustomerName || '',
@@ -1338,9 +1368,12 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
           alignItems: 'center',
           gap: { xs: 2, sm: 3, md: 4 },
           mb: 2.5,
-          flexWrap: 'wrap',
+          overflowX: 'auto',
+          whiteSpace: 'nowrap',
           borderBottom: '1px solid #EEF2F6',
           pb: 0.5,
+          '::-webkit-scrollbar': { display: 'none' },
+          scrollbarWidth: 'none',
         }}
       >
         {subTabs.map((tab) => {
@@ -1593,14 +1626,46 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', sm: '1.2fr 1fr 1.4fr', md: '1.2fr 1fr 1.4fr' },
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: 'repeat(2, 1fr)',
+                    md: '1fr 1.3fr 1.1fr 1.4fr',
+                  },
                   gap: 2,
                 }}
               >
-                {/* 1. Customer */}
+                {/* 1. Bill No * */}
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    Customer *
+                    Bill No <span style={{ color: '#DC2626' }}>*</span>
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Enter Bill No (e.g. 101)"
+                    value={billNo}
+                    onChange={(e) => setBillNo(e.target.value)}
+                    slotProps={{
+                      input: {
+                        sx: {
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          height: '36px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '6px',
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+
+                {/* 2. Customer Name * */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    Customer Name <span style={{ color: '#DC2626' }}>*</span>
                   </Typography>
                   <Autocomplete
                     fullWidth
@@ -1646,16 +1711,9 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                             fontSize: '13px',
                             fontWeight: 600,
                             color: '#0F172A',
-                            '& fieldset': {
-                              borderColor: '#CBD5E1',
-                            },
-                            '&:hover fieldset': {
-                              borderColor: '#94A3B8',
-                            },
-                            '&.Mui-focused fieldset': {
-                              borderColor: '#0B4DB7',
-                              borderWidth: '1.5px',
-                            },
+                            '& fieldset': { borderColor: '#CBD5E1' },
+                            '&:hover fieldset': { borderColor: '#94A3B8' },
+                            '&.Mui-focused fieldset': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
                           },
                         }}
                       />
@@ -1663,7 +1721,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   />
                 </Box>
 
-                {/* 2. Mobile Number * */}
+                {/* 3. Mobile Number * */}
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
                     Mobile Number <span style={{ color: '#DC2626' }}>*</span>
@@ -1686,31 +1744,24 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                           backgroundColor: '#FFFFFF',
                           color: '#0F172A',
                           borderRadius: '6px',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#CBD5E1',
-                          },
-                          '&:hover .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#94A3B8',
-                          },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#0B4DB7',
-                            borderWidth: '1.5px',
-                          },
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
                         },
                       },
                     }}
                   />
                 </Box>
 
-                {/* 3. Address (City, State, Pincode) */}
+                {/* 4. Address */}
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    Address (City, State, Pincode)
+                    Address
                   </Typography>
                   <TextField
                     fullWidth
                     size="small"
-                    placeholder="City, State, Pincode"
+                    placeholder="City, Pincode"
                     value={customerAddress}
                     onChange={(e) => {
                       setCustomerAddress(e.target.value);
@@ -1724,31 +1775,86 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                           height: '36px',
                           backgroundColor: '#FFFFFF',
                           borderRadius: '6px',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#CBD5E1',
-                          },
-                          '&:hover .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#94A3B8',
-                          },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#0B4DB7',
-                            borderWidth: '1.5px',
-                          },
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
                         },
                       },
                     }}
                   />
                 </Box>
 
-                {/* 4. GST Number (Optional) */}
+                {/* 5. State */}
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    GST Number (Optional)
+                    State
                   </Typography>
                   <TextField
                     fullWidth
                     size="small"
-                    placeholder="GSTIN (e.g. 33AAAAA0000A1Z5)"
+                    placeholder="State (e.g. Tamil Nadu)"
+                    value={customerState}
+                    onChange={(e) => {
+                      setCustomerState(e.target.value);
+                      localStorage.setItem('dheeksha_particular_cust_state', e.target.value);
+                    }}
+                    slotProps={{
+                      input: {
+                        sx: {
+                          fontSize: '13px',
+                          fontWeight: 500,
+                          height: '36px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '6px',
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+
+                {/* 6. Transport Name */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    Transport Name
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Enter Transport Name"
+                    value={transportName}
+                    onChange={(e) => {
+                      setTransportName(e.target.value);
+                      localStorage.setItem('dheeksha_particular_transport', e.target.value);
+                    }}
+                    slotProps={{
+                      input: {
+                        sx: {
+                          fontSize: '13px',
+                          fontWeight: 500,
+                          height: '36px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '6px',
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+
+                {/* 7. GST Number / PAN / AADHAR no */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    GST Number / PAN / AADHAR no
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="GSTIN / PAN / AADHAR (Optional)"
                     value={customerGst}
                     onChange={(e) => {
                       setCustomerGst(e.target.value);
@@ -1762,58 +1868,16 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                           height: '36px',
                           backgroundColor: '#FFFFFF',
                           borderRadius: '6px',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#CBD5E1',
-                          },
-                          '&:hover .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#94A3B8',
-                          },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#0B4DB7',
-                            borderWidth: '1.5px',
-                          },
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
                         },
                       },
                     }}
                   />
                 </Box>
 
-                {/* 5. Bill No * */}
-                <Box>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    Bill No <span style={{ color: '#DC2626' }}>*</span>
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    placeholder="Enter Bill No (e.g. 101)"
-                    value={billNo}
-                    onChange={(e) => setBillNo(e.target.value)}
-                    slotProps={{
-                      input: {
-                        sx: {
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          height: '36px',
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: '6px',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#CBD5E1',
-                          },
-                          '&:hover .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#94A3B8',
-                          },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                            borderColor: '#0B4DB7',
-                            borderWidth: '1.5px',
-                          },
-                        },
-                      },
-                    }}
-                  />
-                </Box>
-
-                {/* 6. Date */}
+                {/* 8. Date */}
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
                     Date
@@ -1965,24 +2029,26 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 }}
               />
 
-              <TextField
-                size="small"
-                placeholder="Rate"
-                type="number"
-                value={rate}
-                onChange={(e) => setRate(e.target.value)}
-                sx={{
-                  flex: { xs: '1 1 45%', sm: 0.9 },
-                  minWidth: '70px',
-                  '& .MuiOutlinedInput-root': {
-                    height: '36px',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    borderRadius: '6px',
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
-                  },
-                }}
-              />
+              {isRateVisible && (
+                <TextField
+                  size="small"
+                  placeholder="Rate"
+                  type="number"
+                  value={rate}
+                  onChange={(e) => setRate(e.target.value)}
+                  sx={{
+                    flex: { xs: '1 1 45%', sm: 0.9 },
+                    minWidth: '70px',
+                    '& .MuiOutlinedInput-root': {
+                      height: '36px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      borderRadius: '6px',
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                    },
+                  }}
+                />
+              )}
 
               <TextField
                 size="small"
@@ -2099,22 +2165,24 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     >
                       NO. OF COUNTS
                     </TableCell>
-                    <TableCell
-                      sx={{
-                        py: 1.4,
-                        px: 1.5,
-                        fontSize: '11.5px',
-                        fontWeight: 700,
-                        color: '#1E293B',
-                        letterSpacing: '0.04em',
-                        textAlign: 'center',
-                        borderBottom: '1px solid #E2E8F0',
-                        borderRight: '1px solid #E2E8F0',
-                        width: '12%',
-                      }}
-                    >
-                      RATE
-                    </TableCell>
+                    {isRateVisible && (
+                      <TableCell
+                        sx={{
+                          py: 1.4,
+                          px: 1.5,
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          color: '#1E293B',
+                          letterSpacing: '0.04em',
+                          textAlign: 'center',
+                          borderBottom: '1px solid #E2E8F0',
+                          borderRight: '1px solid #E2E8F0',
+                          width: '12%',
+                        }}
+                      >
+                        RATE
+                      </TableCell>
+                    )}
                     <TableCell
                       sx={{
                         py: 1.4,
@@ -2328,49 +2396,51 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                             )}
                           </TableCell>
 
-                          <TableCell
-                            align="center"
-                            sx={{
-                              borderBottom: '1px solid #E2E8F0',
-                              borderRight: '1px solid #E2E8F0',
-                              fontWeight: 600,
-                              fontSize: '13px',
-                              py: isEditing ? 0.8 : 1.2,
-                            }}
-                          >
-                            {isEditing ? (
-                              <TextField
-                                size="small"
-                                type="number"
-                                value={editRowData.rate}
-                                onChange={(e) =>
-                                  setEditRowData((prev) => ({ ...prev, rate: e.target.value }))
-                                }
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSaveEditRow(row.id);
-                                  } else if (e.key === 'Escape') {
-                                    handleCancelEditRow();
+                          {isRateVisible && (
+                            <TableCell
+                              align="center"
+                              sx={{
+                                borderBottom: '1px solid #E2E8F0',
+                                borderRight: '1px solid #E2E8F0',
+                                fontWeight: 600,
+                                fontSize: '13px',
+                                py: isEditing ? 0.8 : 1.2,
+                              }}
+                            >
+                              {isEditing ? (
+                                <TextField
+                                  size="small"
+                                  type="number"
+                                  value={editRowData.rate}
+                                  onChange={(e) =>
+                                    setEditRowData((prev) => ({ ...prev, rate: e.target.value }))
                                   }
-                                }}
-                                slotProps={{
-                                  input: {
-                                    sx: {
-                                      fontSize: '13px',
-                                      fontWeight: 700,
-                                      textAlign: 'center',
-                                      backgroundColor: '#FFFFFF',
-                                      '& input': { textAlign: 'center', py: 0.5, px: 0.5 },
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSaveEditRow(row.id);
+                                    } else if (e.key === 'Escape') {
+                                      handleCancelEditRow();
+                                    }
+                                  }}
+                                  slotProps={{
+                                    input: {
+                                      sx: {
+                                        fontSize: '13px',
+                                        fontWeight: 700,
+                                        textAlign: 'center',
+                                        backgroundColor: '#FFFFFF',
+                                        '& input': { textAlign: 'center', py: 0.5, px: 0.5 },
+                                      },
                                     },
-                                  },
-                                }}
-                                sx={{ width: '85px' }}
-                              />
-                            ) : (
-                              row.rate
-                            )}
-                          </TableCell>
+                                  }}
+                                  sx={{ width: '85px' }}
+                                />
+                              ) : (
+                                row.rate
+                              )}
+                            </TableCell>
+                          )}
 
                           <TableCell
                             align="center"
@@ -2516,6 +2586,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                         <TableCell sx={{ borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0' }} />
                         <TableCell sx={{ borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0' }} />
                         <TableCell sx={{ borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0' }} />
+                        {isRateVisible && <TableCell sx={{ borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0' }} />}
                         <TableCell sx={{ borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0' }} />
                         <TableCell sx={{ borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0' }} />
                         <TableCell sx={{ borderBottom: '1px solid #E2E8F0' }} />
@@ -2526,169 +2597,159 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
               </Table>
             </TableContainer>
 
-            {/* Below Products Table: Discount, Tax, Amount, Total & Click to Create */}
+            {/* Below Products Table: Right-aligned Calculation & Submit */}
             <Box
               sx={{
                 p: { xs: 2, sm: 2.5 },
                 backgroundColor: '#F8FAFC',
                 borderTop: '1px solid #E2E8F0',
                 display: 'flex',
-                flexDirection: 'column',
-                gap: 2,
+                justifyContent: { xs: 'stretch', sm: 'flex-end' },
               }}
             >
               <Box
                 sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1.2fr 1.2fr 1.1fr 1.2fr 1.4fr' },
-                  gap: 2,
-                  alignItems: 'flex-end',
+                  width: { xs: '100%', sm: '380px', md: '400px' },
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1.5,
+                  backgroundColor: '#FFFFFF',
+                  p: 2.2,
+                  borderRadius: '10px',
+                  border: '1px solid #E2E8F0',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                 }}
               >
-                {/* Discount (%) */}
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}>
-                      Discount (%)
-                    </Typography>
-                    {discountVal > 0 && (
-                      <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#DC2626' }}>
-                        -₹{discountVal.toFixed(2)}
-                      </Typography>
-                    )}
-                  </Box>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    placeholder="0"
-                    value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
-                    slotProps={{
-                      input: {
-                        sx: {
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          height: '38px',
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: '6px',
-                          '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
-                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
-                        },
-                      },
-                    }}
-                  />
-                </Box>
-
-                {/* Tax (₹) */}
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}>
-                      Tax (₹)
-                    </Typography>
-                    {taxVal > 0 && (
-                      <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#16A34A' }}>
-                        +₹{taxVal.toFixed(2)}
-                      </Typography>
-                    )}
-                  </Box>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    placeholder="Enter Tax Amount"
-                    value={tax}
-                    onChange={(e) => setTax(e.target.value)}
-                    slotProps={{
-                      input: {
-                        sx: {
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          height: '38px',
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: '6px',
-                          '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
-                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
-                        },
-                      },
-                    }}
-                  />
-                </Box>
-
-                {/* Amount */}
-                <Box>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                {/* 1. Amount (Subtotal) */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>
                     Amount
                   </Typography>
-                  <Box
-                    sx={{
-                      height: '38px',
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: '6px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '14px',
-                      fontWeight: 700,
-                      color: '#0F172A',
-                      px: 1.5,
-                    }}
-                  >
+                  <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>
                     ₹{subtotalAmount.toFixed(2)}
-                  </Box>
-                </Box>
-
-                {/* Total */}
-                <Box>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    Total
                   </Typography>
-                  <Box
-                    sx={{
-                      height: '38px',
-                      backgroundColor: '#EFF6FF',
-                      border: '1.5px solid #3B82F6',
-                      borderRadius: '6px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '14.5px',
-                      fontWeight: 800,
-                      color: '#1D4ED8',
-                      px: 1.5,
-                    }}
-                  >
-                    ₹{finalTotalAmount}
+                </Box>
+
+                <Divider sx={{ my: 0.2 }} />
+
+                {/* 2. Discount Box and Tax Box (Stacked Vertically) */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {/* Discount Box */}
+                  <Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.4 }}>
+                      <Typography sx={{ fontSize: '11.5px', fontWeight: 600, color: '#475569' }}>
+                        Discount (%)
+                      </Typography>
+                      {discountVal > 0 && (
+                        <Typography sx={{ fontSize: '10.5px', fontWeight: 700, color: '#DC2626' }}>
+                          -₹{discountVal.toFixed(2)}
+                        </Typography>
+                      )}
+                    </Box>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="0"
+                      value={discount}
+                      onChange={(e) => setDiscount(e.target.value)}
+                      slotProps={{
+                        input: {
+                          sx: {
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            height: '36px',
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: '6px',
+                            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
+                          },
+                        },
+                      }}
+                    />
+                  </Box>
+
+                  {/* Tax Box */}
+                  <Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.4 }}>
+                      <Typography sx={{ fontSize: '11.5px', fontWeight: 600, color: '#475569' }}>
+                        Tax (₹)
+                      </Typography>
+                      {taxVal > 0 && (
+                        <Typography sx={{ fontSize: '10.5px', fontWeight: 700, color: '#16A34A' }}>
+                          +₹{taxVal.toFixed(2)}
+                        </Typography>
+                      )}
+                    </Box>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="Enter Tax"
+                      value={tax}
+                      onChange={(e) => setTax(e.target.value)}
+                      slotProps={{
+                        input: {
+                          sx: {
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            height: '36px',
+                            backgroundColor: '#FFFFFF',
+                            borderRadius: '6px',
+                            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
+                          },
+                        },
+                      }}
+                    />
                   </Box>
                 </Box>
 
-                {/* Click to Create Button */}
-                <Box>
-                  <Button
-                    variant="contained"
-                    disableElevation
-                    fullWidth
-                    onClick={handleCreateParticular}
-                    disabled={createLoading}
-                    sx={{
-                      backgroundColor: '#0284C7',
-                      color: '#FFFFFF',
-                      height: '38px',
-                      px: 2.5,
-                      fontSize: '13px',
-                      fontWeight: 700,
-                      textTransform: 'none',
-                      borderRadius: '6px',
-                      boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
-                      '&:hover': {
-                        backgroundColor: '#0369A1',
-                      },
-                    }}
-                  >
-                    {createLoading ? 'Creating...' : 'Click to Create'}
-                  </Button>
+                <Divider sx={{ my: 0.2 }} />
+
+                {/* 3. Grand Total Box */}
+                <Box
+                  sx={{
+                    p: 1.2,
+                    backgroundColor: '#EFF6FF',
+                    border: '1.5px solid #3B82F6',
+                    borderRadius: '6px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#1E40AF' }}>
+                    Grand Total
+                  </Typography>
+                  <Typography sx={{ fontSize: '16px', fontWeight: 800, color: '#1D4ED8' }}>
+                    ₹{finalTotalAmount}
+                  </Typography>
                 </Box>
+
+                {/* 4. Submit Button */}
+                <Button
+                  variant="contained"
+                  disableElevation
+                  fullWidth
+                  onClick={handleCreateParticular}
+                  disabled={createLoading}
+                  sx={{
+                    backgroundColor: '#0284C7',
+                    color: '#FFFFFF',
+                    height: '40px',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    borderRadius: '6px',
+                    boxShadow: '0 2px 4px rgba(2, 132, 199, 0.25)',
+                    '&:hover': {
+                      backgroundColor: '#0369A1',
+                    },
+                  }}
+                >
+                  {createLoading ? 'Submitting...' : 'Submit'}
+                </Button>
               </Box>
             </Box>
           </Paper>
@@ -2840,9 +2901,9 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 px: { xs: 2, sm: 3 },
                 py: 1.5,
                 display: 'flex',
-                alignItems: 'center',
+                flexDirection: { xs: 'column', md: 'row' },
+                alignItems: { xs: 'stretch', md: 'center' },
                 justifyContent: 'space-between',
-                flexWrap: 'wrap',
                 gap: 1.5,
                 minHeight: '52px',
               }}
@@ -2858,7 +2919,15 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 Account Details {accountFilterCustomer && accountFilterCustomer !== 'ALL' ? `- ${accountFilterCustomer}` : '(All Customers)'}
               </Typography>
 
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  alignItems: 'stretch',
+                  gap: 1.2,
+                  width: { xs: '100%', md: 'auto' },
+                }}
+              >
                 <Autocomplete
                   size="small"
                   openOnFocus
@@ -2905,7 +2974,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     setAccountFilterCustomer(selectedName);
                     fetchAccounts(selectedName);
                   }}
-                  sx={{ width: 220 }}
+                  sx={{ width: { xs: '100%', sm: 220 } }}
                   renderInput={(params) => (
                     <TextField
                       {...params}
@@ -2936,50 +3005,66 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     />
                   )}
                 />
-                <Button
-                  variant="contained"
-                  disableElevation
-                  onClick={handleShareLedgerWhatsApp}
-                  startIcon={<WhatsAppIcon sx={{ fontSize: '18px !important', color: '#FFFFFF' }} />}
+
+                <Box
                   sx={{
-                    backgroundColor: '#25D366',
-                    color: '#FFFFFF',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    textTransform: 'none',
-                    px: 2,
-                    py: 0.7,
-                    borderRadius: '6px',
-                    lineHeight: 1.2,
-                    '&:hover': {
-                      backgroundColor: '#1EBE5D',
-                    },
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.2,
+                    width: { xs: '100%', sm: 'auto' },
                   }}
                 >
-                  Share on WhatsApp
-                </Button>
-                <Button
-                  variant="contained"
-                  disableElevation
-                  onClick={() => setOpenAccountDateModal(true)}
-                  startIcon={<PrintOutlinedIcon sx={{ fontSize: '18px !important', color: '#0F172A' }} />}
-                  sx={{
-                    backgroundColor: '#FFFFFF',
-                    color: '#0F172A',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    textTransform: 'none',
-                    px: 2.2,
-                    py: 0.7,
-                    borderRadius: '6px',
-                    lineHeight: 1.2,
-                    '&:hover': {
-                      backgroundColor: '#F8FAFC',
-                    },
-                  }}
-                >
-                  Click to Print
-                </Button>
+                  <Button
+                    variant="contained"
+                    disableElevation
+                    onClick={handleShareLedgerWhatsApp}
+                    startIcon={<WhatsAppIcon sx={{ fontSize: '18px !important', color: '#FFFFFF' }} />}
+                    sx={{
+                      flex: { xs: 1, sm: 'none' },
+                      minWidth: 0,
+                      backgroundColor: '#25D366',
+                      color: '#FFFFFF',
+                      fontSize: { xs: '12px', sm: '13px' },
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      px: { xs: 1.2, sm: 2 },
+                      py: 0.7,
+                      borderRadius: '6px',
+                      whiteSpace: 'nowrap',
+                      lineHeight: 1.2,
+                      '&:hover': {
+                        backgroundColor: '#1EBE5D',
+                      },
+                    }}
+                  >
+                    Share on WhatsApp
+                  </Button>
+                  <Button
+                    variant="contained"
+                    disableElevation
+                    onClick={() => setOpenAccountDateModal(true)}
+                    startIcon={<PrintOutlinedIcon sx={{ fontSize: '18px !important', color: '#0F172A' }} />}
+                    sx={{
+                      flex: { xs: 1, sm: 'none' },
+                      minWidth: 0,
+                      backgroundColor: '#FFFFFF',
+                      color: '#0F172A',
+                      fontSize: { xs: '12px', sm: '13px' },
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      px: { xs: 1.2, sm: 2.2 },
+                      py: 0.7,
+                      borderRadius: '6px',
+                      whiteSpace: 'nowrap',
+                      lineHeight: 1.2,
+                      '&:hover': {
+                        backgroundColor: '#F8FAFC',
+                      },
+                    }}
+                  >
+                    Click to Print
+                  </Button>
+                </Box>
               </Box>
             </Box>
 
@@ -3171,25 +3256,45 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
               px: { xs: 2, sm: 3 },
               py: 1.5,
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: { xs: 'stretch', md: 'center' },
               justifyContent: 'space-between',
-              flexWrap: 'wrap',
               gap: 1.5,
               minHeight: '52px',
             }}
           >
-            <Typography
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+              <Typography
+                sx={{
+                  color: '#FFFFFF',
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                Particular Details {particularFilterCustomer && particularFilterCustomer !== 'ALL' ? `- ${particularFilterCustomer}` : '(All Customers)'}
+              </Typography>
+              <Chip
+                label={`${sortedParticularDetails.length} Bills`}
+                size="small"
+                sx={{
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                }}
+              />
+            </Box>
+
+            <Box
               sx={{
-                color: '#FFFFFF',
-                fontSize: '16px',
-                fontWeight: 700,
-                letterSpacing: '-0.01em',
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: 'stretch',
+                gap: 1.2,
+                width: { xs: '100%', md: 'auto' },
               }}
             >
-              Particular Details {particularFilterCustomer && particularFilterCustomer !== 'ALL' ? `- ${particularFilterCustomer}` : '(All Customers)'}
-            </Typography>
-
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
               <Autocomplete
                 size="small"
                 openOnFocus
@@ -3236,7 +3341,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   setParticularFilterCustomer(selectedName);
                   fetchParticulars(selectedName);
                 }}
-                sx={{ width: 220 }}
+                sx={{ width: { xs: '100%', sm: 220 } }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -3267,58 +3372,64 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   />
                 )}
               />
-              <Chip
-                label={`${sortedParticularDetails.length} Bills`}
-                size="small"
+
+              <Box
                 sx={{
-                  backgroundColor: 'rgba(255,255,255,0.2)',
-                  color: '#FFFFFF',
-                  fontWeight: 700,
-                  fontSize: '12px',
-                }}
-              />
-              <Button
-                variant="contained"
-                disableElevation
-                onClick={handleShareParticularsListWhatsApp}
-                startIcon={<WhatsAppIcon sx={{ fontSize: '18px !important', color: '#FFFFFF' }} />}
-                sx={{
-                  backgroundColor: '#25D366',
-                  color: '#FFFFFF',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  textTransform: 'none',
-                  px: 2,
-                  py: 0.6,
-                  borderRadius: '6px',
-                  '&:hover': {
-                    backgroundColor: '#1EBE5D',
-                  },
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.2,
+                  width: { xs: '100%', sm: 'auto' },
                 }}
               >
-                Share on WhatsApp
-              </Button>
-              <Button
-                variant="contained"
-                disableElevation
-                onClick={() => setOpenParticularDateModal(true)}
-                startIcon={<PrintOutlinedIcon sx={{ fontSize: '18px !important', color: '#0F172A' }} />}
-                sx={{
-                  backgroundColor: '#FFFFFF',
-                  color: '#0F172A',
-                  fontSize: '13px',
-                  fontWeight: 700,
-                  textTransform: 'none',
-                  px: 2,
-                  py: 0.6,
-                  borderRadius: '6px',
-                  '&:hover': {
-                    backgroundColor: '#F8FAFC',
-                  },
-                }}
-              >
-                Print Bills List
-              </Button>
+                <Button
+                  variant="contained"
+                  disableElevation
+                  onClick={handleShareParticularsListWhatsApp}
+                  startIcon={<WhatsAppIcon sx={{ fontSize: '18px !important', color: '#FFFFFF' }} />}
+                  sx={{
+                    flex: { xs: 1, sm: 'none' },
+                    minWidth: 0,
+                    backgroundColor: '#25D366',
+                    color: '#FFFFFF',
+                    fontSize: { xs: '12px', sm: '13px' },
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    px: { xs: 1.2, sm: 2 },
+                    py: 0.6,
+                    borderRadius: '6px',
+                    whiteSpace: 'nowrap',
+                    '&:hover': {
+                      backgroundColor: '#1EBE5D',
+                    },
+                  }}
+                >
+                  Share on WhatsApp
+                </Button>
+                <Button
+                  variant="contained"
+                  disableElevation
+                  onClick={() => setOpenParticularDateModal(true)}
+                  startIcon={<PrintOutlinedIcon sx={{ fontSize: '18px !important', color: '#0F172A' }} />}
+                  sx={{
+                    flex: { xs: 1, sm: 'none' },
+                    minWidth: 0,
+                    backgroundColor: '#FFFFFF',
+                    color: '#0F172A',
+                    fontSize: { xs: '12px', sm: '13px' },
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    px: { xs: 1.2, sm: 2 },
+                    py: 0.6,
+                    borderRadius: '6px',
+                    whiteSpace: 'nowrap',
+                    '&:hover': {
+                      backgroundColor: '#F8FAFC',
+                    },
+                  }}
+                >
+                  Print Bills List
+                </Button>
+              </Box>
             </Box>
           </Box>
 
@@ -3785,7 +3896,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     },
                   }}
                 >
-                  {creditLoading ? 'Saving...' : 'Click to create'}
+                  {creditLoading ? 'Submitting...' : 'Submit'}
                 </Button>
               </Box>
             </Box>
@@ -3993,6 +4104,35 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         open={printModalOpen}
         onClose={() => setPrintModalOpen(false)}
         bill={selectedBillForPrint}
+        onSaveBillTraderInfo={async (billId, info) => {
+          try {
+            await ParticularsApi.update(billId, {
+              traderAddress: info.traderAddress,
+              traderGst: info.traderGst,
+              traderPhone: info.traderPhone,
+              companyAddress: info.traderAddress,
+              companyGst: info.traderGst,
+              companyPhone: info.traderPhone,
+            });
+            setParticularDetails((prev: any[]) =>
+              prev.map((item: any) =>
+                item._id === billId || item.id === billId
+                  ? {
+                      ...item,
+                      traderAddress: info.traderAddress,
+                      traderGst: info.traderGst,
+                      traderPhone: info.traderPhone,
+                      companyAddress: info.traderAddress,
+                      companyGst: info.traderGst,
+                      companyPhone: info.traderPhone,
+                    }
+                  : item
+              )
+            );
+          } catch (err) {
+            console.error('Failed to update trader info on bill:', err);
+          }
+        }}
       />
 
       {/* Toast Notification for PDF Uploads */}

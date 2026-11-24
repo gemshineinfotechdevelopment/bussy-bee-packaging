@@ -151,6 +151,22 @@ export const AuthApi = {
       body: JSON.stringify(credentials),
     }),
   getMe: () => request<any>('/auth/me'),
+  getUsers: () => request<any[]>('/auth/users'),
+  updateUser: (role: 'admin' | 'superadmin', data: { username?: string; password?: string }) =>
+    request<{ success: boolean; message: string; data: any }>(`/auth/users/${role}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+};
+
+// System Settings API
+export const SettingsApi = {
+  getSettings: () => request<Record<string, any>>('/settings'),
+  updateSettings: (settings: Record<string, any>) =>
+    request<{ success: boolean; message: string; data: Record<string, any> }>('/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
 };
 
 // Health Check API

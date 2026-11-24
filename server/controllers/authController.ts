@@ -8,8 +8,8 @@ const hashPassword = (password: string): string => {
 
 export const seedDefaultAdmin = async (): Promise<void> => {
   try {
-    // 1. Ensure default 'admin' exists
-    const existingAdmin = await Admin.findOne({ username: 'admin' });
+    // 1. Ensure default 'admin' exists if no account with role 'admin' exists
+    const existingAdmin = await Admin.findOne({ role: 'admin' });
     if (!existingAdmin) {
       await Admin.create({
         username: 'admin',
@@ -21,8 +21,8 @@ export const seedDefaultAdmin = async (): Promise<void> => {
       console.log('=============================================');
     }
 
-    // 2. Ensure default 'superadmin' exists
-    const existingSuperAdmin = await Admin.findOne({ username: 'superadmin' });
+    // 2. Ensure default 'superadmin' exists if no account with role 'superadmin' exists
+    const existingSuperAdmin = await Admin.findOne({ role: 'superadmin' });
     if (!existingSuperAdmin) {
       await Admin.create({
         username: 'superadmin',
@@ -32,9 +32,6 @@ export const seedDefaultAdmin = async (): Promise<void> => {
       console.log('=============================================');
       console.log('[Auth] Default Super Admin created: superadmin / superadmin123 (role: superadmin)');
       console.log('=============================================');
-    } else if (existingSuperAdmin.role !== 'superadmin') {
-      existingSuperAdmin.role = 'superadmin';
-      await existingSuperAdmin.save();
     }
   } catch (error) {
     console.error('[Auth Error] Failed to seed default admin users:', error);
@@ -55,24 +52,7 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
     const hashedPassword = hashPassword(cleanPassword);
 
     // Find admin user by username
-    let admin = await Admin.findOne({ username: cleanUsername });
-
-    // If default user doesn't exist yet, auto seed based on username
-    if (!admin) {
-      if (cleanUsername === 'superadmin') {
-        admin = await Admin.create({
-          username: 'superadmin',
-          password: hashedPassword,
-          role: 'superadmin',
-        });
-      } else if (cleanUsername === 'admin' || cleanUsername === 'bussybee' || cleanUsername === 'dheeksha') {
-        admin = await Admin.create({
-          username: cleanUsername,
-          password: hashedPassword,
-          role: 'admin',
-        });
-      }
-    }
+    const admin = await Admin.findOne({ username: cleanUsername });
 
     if (!admin) {
       res.status(401).json({ success: false, error: 'Invalid username or password' });
@@ -117,6 +97,63 @@ export const getMe = async (_req: Request, res: Response, next: NextFunction): P
   try {
     const admin = await Admin.findOne().select('-password');
     res.status(200).json({ success: true, data: admin });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getUsers = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const users = await Admin.find().select('-password');
+    res.status(200).json({ success: true, data: users });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateUserCredentials = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const roleParam = (req.params.role || req.body.role || '').toLowerCase().trim();
+    const { username, password } = req.body;
+
+    if (roleParam !== 'admin' && roleParam !== 'superadmin') {
+      res.status(400).json({ success: false, error: 'Role must be either "admin" or "superadmin"' });
+      return;
+    }
+
+    let user = await Admin.findOne({ role: roleParam });
+    if (!user) {
+      user = new Admin({ role: roleParam });
+    }
+
+    if (username && username.trim()) {
+      const cleanUsername = username.trim().toLowerCase();
+      // Ensure no conflict with another user
+      const conflict = await Admin.findOne({ username: cleanUsername, _id: { $ne: user._id } });
+      if (conflict) {
+        res.status(400).json({
+          success: false,
+          error: `Username "${cleanUsername}" is already used by another account. Please choose a different username.`,
+        });
+        return;
+      }
+      user.username = cleanUsername;
+    }
+
+    if (password && password.trim()) {
+      user.password = hashPassword(password.trim());
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `${roleParam === 'superadmin' ? 'Super Admin' : 'Admin'} credentials updated successfully!`,
+      data: {
+        username: user.username,
+        role: user.role,
+      },
+    });
   } catch (error) {
     next(error);
   }

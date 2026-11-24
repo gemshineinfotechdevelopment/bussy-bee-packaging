@@ -10,6 +10,7 @@ import { CompaniesPage } from './components/CompaniesPage';
 import { AddCompanyPage } from './components/AddCompanyPage';
 import { ProductsPage } from './components/ProductsPage';
 import { ParticularsPage, type ParticularSubTab } from './components/ParticularsPage';
+import { SettingsPage } from './components/SettingsPage';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
@@ -83,8 +84,8 @@ function App() {
     // Company is disabled in navbar
     if (tab === 'Company') return;
 
-    // Only Super Admin can access 'All Customers'
-    if (tab === 'All Customers' && currentUser?.role !== 'superadmin') {
+    // Only Super Admin can access 'All Customers' and 'Settings'
+    if ((tab === 'All Customers' || tab === 'Settings') && currentUser?.role !== 'superadmin') {
       setActiveTab('Customers');
       localStorage.setItem('dheeksha_active_tab', 'Customers');
       return;
@@ -156,7 +157,7 @@ function App() {
           onLogout={handleLogout}
         />
 
-        <Box component="main" sx={{ flexGrow: 1, width: '100%' }}>
+        <Box component="main" sx={{ flexGrow: 1, width: '100%', overflowX: 'hidden' }}>
           {/* Particulars Tab */}
           {activeTab === 'Particulars' && (
             <ParticularsPage
@@ -213,10 +214,15 @@ function App() {
             </>
           )}
 
+          {/* Settings Tab (Super Admin Only) */}
+          {activeTab === 'Settings' && currentUser?.role === 'superadmin' && (
+            <SettingsPage currentUser={currentUser} />
+          )}
+
           {/* Fallback for unauthorized or invalid tabs */}
-          {activeTab === 'All Customers' && currentUser?.role !== 'superadmin' && (
+          {(activeTab === 'All Customers' || activeTab === 'Settings') && currentUser?.role !== 'superadmin' && (
             <Box sx={{ p: 4, textAlign: 'center', color: '#DC2626' }}>
-              Access restricted. Only Super Admin can view All Customers.
+              Access restricted. Only Super Admin can access this page.
             </Box>
           )}
 
@@ -225,7 +231,8 @@ function App() {
             activeTab !== 'Product' &&
             activeTab !== 'Company' &&
             activeTab !== 'All Customers' &&
-            activeTab !== 'Customers' && (
+            activeTab !== 'Customers' &&
+            activeTab !== 'Settings' && (
               <Box sx={{ p: 4, textAlign: 'center', color: '#64748B' }}>
                 {activeTab} content coming soon.
               </Box>

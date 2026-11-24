@@ -10,10 +10,13 @@ export interface BillPrintProduct {
 }
 
 export interface BillPrintData {
+  id?: string;
+  _id?: string;
   billNo: string;
   date: string;
   customerName: string;
   customerAddress?: string;
+  customerState?: string;
   customerPhone?: string;
   customerGst?: string;
   customerMobile?: string;
@@ -110,45 +113,49 @@ export function numberToWords(amount: number): string {
 
 export const BillPrintTemplate: React.FC<BillPrintTemplateProps> = ({ bill, onUpdateTraderInfo }) => {
   const [traderName, setTraderName] = React.useState<string>(() => {
-    return bill.companyName || bill.traderName || localStorage.getItem('dheeksha_trader_name') || 'BUSSY BEE';
+    return bill.companyName || bill.traderName || 'BUSSY BEE';
   });
   const [traderAddress, setTraderAddress] = React.useState<string>(() => {
-    return bill.companyAddress || bill.traderAddress || localStorage.getItem('dheeksha_trader_address') || '';
+    return bill.traderAddress || bill.companyAddress || '';
   });
   const [traderGst, setTraderGst] = React.useState<string>(() => {
-    return bill.companyGst || bill.traderGst || localStorage.getItem('dheeksha_trader_gst') || '';
+    return bill.traderGst || bill.companyGst || '';
   });
   const [traderPhone, setTraderPhone] = React.useState<string>(() => {
-    return bill.companyPhone || bill.traderPhone || (bill.phone && bill.phone !== bill.customerMobile ? bill.phone : '') || localStorage.getItem('dheeksha_trader_phone') || '';
+    return bill.traderPhone || bill.companyPhone || '';
   });
 
   React.useEffect(() => {
-    if (bill.companyName || bill.traderName) setTraderName(bill.companyName || bill.traderName || 'BUSSY BEE');
-    if (bill.companyAddress || bill.traderAddress) setTraderAddress(bill.companyAddress || bill.traderAddress || '');
-    if (bill.companyGst || bill.traderGst) setTraderGst(bill.companyGst || bill.traderGst || '');
-    if (bill.companyPhone || bill.traderPhone || (bill.phone && bill.phone !== bill.customerMobile)) {
-      setTraderPhone(bill.companyPhone || bill.traderPhone || (bill.phone && bill.phone !== bill.customerMobile ? bill.phone : '') || '');
-    }
-  }, [bill.companyName, bill.companyAddress, bill.companyGst, bill.companyPhone, bill.traderName, bill.traderAddress, bill.traderGst, bill.traderPhone, bill.phone, bill.customerMobile]);
+    setTraderName(bill.companyName || bill.traderName || 'BUSSY BEE');
+    setTraderAddress(bill.traderAddress || bill.companyAddress || '');
+    setTraderGst(bill.traderGst || bill.companyGst || '');
+    setTraderPhone(bill.traderPhone || bill.companyPhone || '');
+  }, [
+    bill.billNo,
+    bill.traderAddress,
+    bill.traderGst,
+    bill.traderPhone,
+    bill.companyAddress,
+    bill.companyGst,
+    bill.companyPhone,
+    bill.companyName,
+    bill.traderName,
+  ]);
 
   const handleNameChange = (val: string) => {
     setTraderName(val);
-    localStorage.setItem('dheeksha_trader_name', val);
     onUpdateTraderInfo?.({ traderName: val, traderAddress, traderGst, traderPhone });
   };
   const handleAddrChange = (val: string) => {
     setTraderAddress(val);
-    localStorage.setItem('dheeksha_trader_address', val);
     onUpdateTraderInfo?.({ traderName, traderAddress: val, traderGst, traderPhone });
   };
   const handleGstChange = (val: string) => {
     setTraderGst(val);
-    localStorage.setItem('dheeksha_trader_gst', val);
     onUpdateTraderInfo?.({ traderName, traderAddress, traderGst: val, traderPhone });
   };
   const handlePhoneChange = (val: string) => {
     setTraderPhone(val);
-    localStorage.setItem('dheeksha_trader_phone', val);
     onUpdateTraderInfo?.({ traderName, traderAddress, traderGst, traderPhone: val });
   };
   // Calculate Subtotal from Products or bill.amount
@@ -311,8 +318,8 @@ export const BillPrintTemplate: React.FC<BillPrintTemplateProps> = ({ bill, onUp
             type="text"
             value={traderAddress}
             onChange={(e) => handleAddrChange(e.target.value)}
-            placeholder="Address"
-            title="Address"
+            placeholder="Name"
+            title="Name"
             style={{
               textAlign: 'center',
               fontSize: '11px',
@@ -332,8 +339,8 @@ export const BillPrintTemplate: React.FC<BillPrintTemplateProps> = ({ bill, onUp
               type="text"
               value={traderGst}
               onChange={(e) => handleGstChange(e.target.value)}
-              placeholder="GSTIN"
-              title="GSTIN"
+              placeholder="GST No / PAN or Aadhar"
+              title="GST No / PAN or Aadhar"
               style={{
                 flex: 1,
                 textAlign: 'center',
@@ -352,8 +359,8 @@ export const BillPrintTemplate: React.FC<BillPrintTemplateProps> = ({ bill, onUp
               type="text"
               value={traderPhone}
               onChange={(e) => handlePhoneChange(e.target.value)}
-              placeholder="Phone Number"
-              title="Phone Number"
+              placeholder="mobile number"
+              title="mobile number"
               style={{
                 flex: 1,
                 textAlign: 'center',
@@ -462,7 +469,7 @@ export const BillPrintTemplate: React.FC<BillPrintTemplateProps> = ({ bill, onUp
             <strong>GSTIN / UIN:</strong> {custGst}
           </div>
           <div style={{ fontSize: '11px', color: '#334155' }}>
-            <strong>State Name:</strong> Tamil Nadu, Code: 33
+            <strong>State Name:</strong> {bill.customerState || 'Tamil Nadu, Code: 33'}
           </div>
         </div>
 
@@ -499,7 +506,7 @@ export const BillPrintTemplate: React.FC<BillPrintTemplateProps> = ({ bill, onUp
             <strong>GSTIN / UIN:</strong> {custGst}
           </div>
           <div style={{ fontSize: '11px', color: '#334155' }}>
-            <strong>State Name:</strong> Tamil Nadu, Code: 33
+            <strong>State Name:</strong> {bill.customerState || 'Tamil Nadu, Code: 33'}
           </div>
         </div>
       </div>

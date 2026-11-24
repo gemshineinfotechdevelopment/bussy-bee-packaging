@@ -378,10 +378,10 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
         <Box
           sx={{
             display: 'flex',
-            alignItems: 'center',
+            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: 'stretch',
             gap: 1.5,
             width: { xs: '100%', md: 'auto' },
-            flexWrap: 'wrap',
           }}
         >
           {/* Search Box */}
@@ -393,8 +393,8 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
               borderRadius: '8px',
               border: '1px solid #E2E8F0',
               px: 1.5,
-              height: '40px',
-              width: { xs: '100%', sm: '280px' },
+              height: '38px',
+              width: { xs: '100%', sm: '260px' },
               boxSizing: 'border-box',
               boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
               transition: 'all 0.2s',
@@ -410,7 +410,7 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
             <SearchRoundedIcon
               sx={{
                 color: '#8E9AA8',
-                fontSize: 20,
+                fontSize: 19,
                 mr: 1,
               }}
             />
@@ -434,60 +434,74 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
             />
           </Box>
 
-          {/* Print All / Filtered Customers Report Button with Date Range Filter */}
-          <Button
-            variant="outlined"
-            onClick={() => setOpenDatePrintModal(true)}
-            startIcon={<PrintOutlinedIcon sx={{ fontSize: 19 }} />}
+          {/* Action Buttons Container */}
+          <Box
             sx={{
-              backgroundColor: '#FFFFFF',
-              color: '#0F172A',
-              borderColor: '#CBD5E1',
-              height: '40px',
-              px: 2,
-              borderRadius: '8px',
-              fontSize: '13.5px',
-              fontWeight: 700,
-              textTransform: 'none',
-              letterSpacing: '-0.01em',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-              '&:hover': {
-                backgroundColor: '#F8FAFC',
-                borderColor: '#94A3B8',
-              },
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.2,
+              width: { xs: '100%', sm: 'auto' },
             }}
           >
-            Print Report ({filteredCustomers.length})
-          </Button>
-
-          {/* Add New Customer Button */}
-          {onAddNewCustomer && (
+            {/* Print All / Filtered Customers Report Button with Date Range Filter */}
             <Button
-              variant="contained"
-              disableElevation
-              onClick={onAddNewCustomer}
-              startIcon={<AddRoundedIcon sx={{ fontSize: 20 }} />}
+              variant="outlined"
+              onClick={() => setOpenDatePrintModal(true)}
+              startIcon={<PrintOutlinedIcon sx={{ fontSize: 18 }} />}
               sx={{
-                backgroundColor: '#0B4DB7',
-                color: '#FFFFFF',
-                height: '40px',
-                px: 2.4,
+                flex: { xs: 1, sm: 'none' },
+                minWidth: 0,
+                backgroundColor: '#FFFFFF',
+                color: '#0F172A',
+                borderColor: '#CBD5E1',
+                height: '38px',
+                px: { xs: 1.2, sm: 2 },
                 borderRadius: '8px',
-                fontSize: '13.5px',
+                fontSize: { xs: '12px', sm: '13.5px' },
                 fontWeight: 700,
                 textTransform: 'none',
                 letterSpacing: '-0.01em',
                 whiteSpace: 'nowrap',
-                boxShadow: '0 2px 4px rgba(11, 77, 183, 0.2)',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
                 '&:hover': {
-                  backgroundColor: '#083B8D',
+                  backgroundColor: '#F8FAFC',
+                  borderColor: '#94A3B8',
                 },
               }}
             >
-              Add Customer
+              Print Report ({filteredCustomers.length})
             </Button>
-          )}
+
+            {/* Add New Customer Button */}
+            {onAddNewCustomer && (
+              <Button
+                variant="contained"
+                disableElevation
+                onClick={onAddNewCustomer}
+                startIcon={<AddRoundedIcon sx={{ fontSize: 19 }} />}
+                sx={{
+                  flex: { xs: 1, sm: 'none' },
+                  minWidth: 0,
+                  backgroundColor: '#0B4DB7',
+                  color: '#FFFFFF',
+                  height: '38px',
+                  px: { xs: 1.2, sm: 2.2 },
+                  borderRadius: '8px',
+                  fontSize: { xs: '12px', sm: '13.5px' },
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  letterSpacing: '-0.01em',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 4px rgba(11, 77, 183, 0.2)',
+                  '&:hover': {
+                    backgroundColor: '#083B8D',
+                  },
+                }}
+              >
+                Add Customer
+              </Button>
+            )}
+          </Box>
         </Box>
       </Box>
 

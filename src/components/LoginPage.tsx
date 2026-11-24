@@ -23,10 +23,10 @@ interface LoginPageProps {
 
 export const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [selectedRole, setSelectedRole] = useState<'admin' | 'superadmin'>('admin');
-  const [adminUsername, setAdminUsername] = useState('admin');
-  const [adminPassword, setAdminPassword] = useState('admin123');
-  const [superUsername, setSuperUsername] = useState('superadmin');
-  const [superPassword, setSuperPassword] = useState('superadmin123');
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [superUsername, setSuperUsername] = useState('');
+  const [superPassword, setSuperPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -80,36 +80,8 @@ export const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
       }
     } catch (err: any) {
       console.error('Login failed:', err);
-      // Fallback offline verification if server is unreachable
-      const lowerUser = targetUser.toLowerCase();
-      if (selectedRole === 'superadmin') {
-        if (
-          lowerUser === 'superadmin' &&
-          (targetPass === 'superadmin123' || targetPass === 'admin123' || targetPass === 'superadmin')
-        ) {
-          const fallbackUser = { username: 'superadmin', role: 'superadmin' };
-          localStorage.setItem('dheeksha_auth_token', 'local-superadmin-token');
-          localStorage.setItem('dheeksha_auth_user', JSON.stringify(fallbackUser));
-          onLoginSuccess(fallbackUser);
-          return;
-        }
-      } else {
-        if (
-          (lowerUser === 'admin' && (targetPass === 'admin123' || targetPass === 'admin')) ||
-          (lowerUser === 'bussybee' && (targetPass === 'bussybee123' || targetPass === 'admin123')) ||
-          (lowerUser === 'dheeksha' && (targetPass === 'dheeksha123' || targetPass === 'admin123'))
-        ) {
-          const fallbackUser = { username: lowerUser, role: 'admin' };
-          localStorage.setItem('dheeksha_auth_token', 'local-admin-token');
-          localStorage.setItem('dheeksha_auth_user', JSON.stringify(fallbackUser));
-          onLoginSuccess(fallbackUser);
-          return;
-        }
-      }
-
       setErrorMsg(
-        err.message ||
-          `Invalid credentials for ${selectedRole === 'superadmin' ? 'Super Admin' : 'Admin'}. (Default: ${selectedRole === 'superadmin' ? 'superadmin / superadmin123' : 'admin / admin123'})`
+        err.message || 'Invalid username or password. Please check your credentials.'
       );
     } finally {
       setLoading(false);
