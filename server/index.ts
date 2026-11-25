@@ -3,8 +3,18 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Load environment variables from server directory and root directory
+// Load environment variables (.env.production or .env from server and root directories)
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction) {
+  dotenv.config({ path: path.join(__dirname, '.env.production') });
+  dotenv.config({ path: path.join(__dirname, '..', '.env.production') });
+  dotenv.config({ path: path.resolve(process.cwd(), '.env.production') });
+  dotenv.config({ path: path.resolve(process.cwd(), 'server', '.env.production') });
+}
 dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), 'server', '.env') });
 dotenv.config();
 
 import { connectDB } from './config/db';
