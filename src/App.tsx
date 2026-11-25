@@ -14,12 +14,12 @@ import { SettingsPage } from './components/SettingsPage';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return Boolean(localStorage.getItem('dheeksha_auth_token'));
+    return Boolean(localStorage.getItem('bussy_bee_auth_token'));
   });
 
   const [currentUser, setCurrentUser] = useState<{ username: string; role: string } | null>(() => {
     try {
-      const raw = localStorage.getItem('dheeksha_auth_user');
+      const raw = localStorage.getItem('bussy_bee_auth_user');
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
@@ -27,10 +27,10 @@ function App() {
   });
 
   const [activeTab, setActiveTab] = useState<NavTab>(() => {
-    const saved = localStorage.getItem('dheeksha_active_tab') as NavTab;
+    const saved = localStorage.getItem('bussy_bee_active_tab') as NavTab;
     let savedUser: { username: string; role: string } | null = null;
     try {
-      const raw = localStorage.getItem('dheeksha_auth_user');
+      const raw = localStorage.getItem('bussy_bee_auth_user');
       if (raw) savedUser = JSON.parse(raw);
     } catch {}
 
@@ -43,19 +43,19 @@ function App() {
   });
 
   const [companySubView, setCompanySubView] = useState<'list' | 'add'>(() => {
-    return (localStorage.getItem('dheeksha_company_subview') as 'list' | 'add') || 'list';
+    return (localStorage.getItem('bussy_bee_company_subview') as 'list' | 'add') || 'list';
   });
 
   const [customerSubView, setCustomerSubView] = useState<'list' | 'add'>(() => {
-    return (localStorage.getItem('dheeksha_customer_subview') as 'list' | 'add') || 'list';
+    return (localStorage.getItem('bussy_bee_customer_subview') as 'list' | 'add') || 'list';
   });
 
   const [selectedCustomerName, setSelectedCustomerName] = useState<string>(() => {
-    return localStorage.getItem('dheeksha_active_customer') || '';
+    return localStorage.getItem('bussy_bee_active_customer') || '';
   });
 
   const [particularInitialSubTab, setParticularInitialSubTab] = useState<ParticularSubTab>(() => {
-    return (localStorage.getItem('dheeksha_particular_subtab') as ParticularSubTab) || 'Select Customer';
+    return (localStorage.getItem('bussy_bee_particular_subtab') as ParticularSubTab) || 'Select Customer';
   });
 
   const handleLoginSuccess = (user: { username: string; role: string }) => {
@@ -64,18 +64,18 @@ function App() {
     // Standard admin should never be on 'All Customers' or 'Company'
     if (user.role !== 'superadmin' && (activeTab === 'All Customers' || activeTab === 'Company')) {
       setActiveTab('Customers');
-      localStorage.setItem('dheeksha_active_tab', 'Customers');
+      localStorage.setItem('bussy_bee_active_tab', 'Customers');
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('dheeksha_auth_token');
-    localStorage.removeItem('dheeksha_auth_user');
-    localStorage.removeItem('dheeksha_active_tab');
-    localStorage.removeItem('dheeksha_company_subview');
-    localStorage.removeItem('dheeksha_customer_subview');
-    localStorage.removeItem('dheeksha_particular_subtab');
-    localStorage.removeItem('dheeksha_active_customer');
+    localStorage.removeItem('bussy_bee_auth_token');
+    localStorage.removeItem('bussy_bee_auth_user');
+    localStorage.removeItem('bussy_bee_active_tab');
+    localStorage.removeItem('bussy_bee_company_subview');
+    localStorage.removeItem('bussy_bee_customer_subview');
+    localStorage.removeItem('bussy_bee_particular_subtab');
+    localStorage.removeItem('bussy_bee_active_customer');
     setCurrentUser(null);
     setIsAuthenticated(false);
   };
@@ -87,42 +87,42 @@ function App() {
     // Only Super Admin can access 'All Customers' and 'Settings'
     if ((tab === 'All Customers' || tab === 'Settings') && currentUser?.role !== 'superadmin') {
       setActiveTab('Customers');
-      localStorage.setItem('dheeksha_active_tab', 'Customers');
+      localStorage.setItem('bussy_bee_active_tab', 'Customers');
       return;
     }
 
     setActiveTab(tab);
-    localStorage.setItem('dheeksha_active_tab', tab);
+    localStorage.setItem('bussy_bee_active_tab', tab);
     if (tab === 'Particulars') {
       setSelectedCustomerName('');
-      localStorage.removeItem('dheeksha_active_customer');
+      localStorage.removeItem('bussy_bee_active_customer');
       setParticularInitialSubTab('Select Customer');
-      localStorage.setItem('dheeksha_particular_subtab', 'Select Customer');
+      localStorage.setItem('bussy_bee_particular_subtab', 'Select Customer');
     }
     if (tab === 'Customers') {
       setCustomerSubView('list');
-      localStorage.setItem('dheeksha_customer_subview', 'list');
+      localStorage.setItem('bussy_bee_customer_subview', 'list');
     }
   };
 
   const handleSetCompanySubView = (view: 'list' | 'add') => {
     setCompanySubView(view);
-    localStorage.setItem('dheeksha_company_subview', view);
+    localStorage.setItem('bussy_bee_company_subview', view);
   };
 
   const handleSetCustomerSubView = (view: 'list' | 'add') => {
     setCustomerSubView(view);
-    localStorage.setItem('dheeksha_customer_subview', view);
+    localStorage.setItem('bussy_bee_customer_subview', view);
   };
 
   const handleCustomerSelectedForParticular = (customerName: string, subTab?: ParticularSubTab) => {
     setSelectedCustomerName(customerName);
-    localStorage.setItem('dheeksha_active_customer', customerName);
+    localStorage.setItem('bussy_bee_active_customer', customerName);
     const targetSubTab = subTab || 'Account Details';
     setParticularInitialSubTab(targetSubTab);
-    localStorage.setItem('dheeksha_particular_subtab', targetSubTab);
+    localStorage.setItem('bussy_bee_particular_subtab', targetSubTab);
     setActiveTab('Particulars');
-    localStorage.setItem('dheeksha_active_tab', 'Particulars');
+    localStorage.setItem('bussy_bee_active_tab', 'Particulars');
   };
 
   if (!isAuthenticated) {

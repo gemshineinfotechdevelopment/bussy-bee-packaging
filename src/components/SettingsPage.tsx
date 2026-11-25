@@ -126,7 +126,7 @@ export const SettingsPage: FC<SettingsPageProps> = ({ currentUser }) => {
       // If current user is superadmin, update local storage username
       if (currentUser?.role === 'superadmin') {
         const updated = { ...currentUser, username: superUsername.trim().toLowerCase() };
-        localStorage.setItem('dheeksha_auth_user', JSON.stringify(updated));
+        localStorage.setItem('bussy_bee_auth_user', JSON.stringify(updated));
       }
 
       showToast(res.message || 'Super Admin credentials updated successfully!');

@@ -158,7 +158,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
     currentUser?.role ||
     (() => {
       try {
-        const u = localStorage.getItem('dheeksha_auth_user');
+        const u = localStorage.getItem('bussy_bee_auth_user');
         return u ? JSON.parse(u)?.role : 'admin';
       } catch {
         return 'admin';
@@ -174,7 +174,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   }, [isSuperAdmin]);
 
   const [activeSubTab, setActiveSubTab] = useState<ParticularSubTab>(() => {
-    const saved = (localStorage.getItem('dheeksha_particular_subtab') as ParticularSubTab) || 'Select Customer';
+    const saved = (localStorage.getItem('bussy_bee_particular_subtab') as ParticularSubTab) || 'Select Customer';
     const target = initialSubTab || saved;
     if (!isSuperAdmin && target === 'Add Credit') {
       return 'Select Customer';
@@ -186,7 +186,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   useEffect(() => {
     if (!isSuperAdmin && activeSubTab === 'Add Credit') {
       setActiveSubTab('Select Customer');
-      localStorage.setItem('dheeksha_particular_subtab', 'Select Customer');
+      localStorage.setItem('bussy_bee_particular_subtab', 'Select Customer');
     }
   }, [isSuperAdmin, activeSubTab]);
 
@@ -235,11 +235,11 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   const [companyAddress, setCompanyAddress] = useState<string>('');
   const [companyGst, setCompanyGst] = useState<string>('');
   const [companyPhone, setCompanyPhone] = useState<string>('');
-  const [customerAddress, setCustomerAddress] = useState<string>(() => localStorage.getItem('dheeksha_particular_cust_addr') || '');
-  const [customerState, setCustomerState] = useState<string>(() => localStorage.getItem('dheeksha_particular_cust_state') || 'Tamil Nadu');
-  const [transportName, setTransportName] = useState<string>(() => localStorage.getItem('dheeksha_particular_transport') || '');
-  const [customerPhone, setCustomerPhone] = useState<string>(() => localStorage.getItem('dheeksha_particular_cust_phone') || '');
-  const [customerGst, setCustomerGst] = useState<string>(() => localStorage.getItem('dheeksha_particular_cust_gst') || '');
+  const [customerAddress, setCustomerAddress] = useState<string>(() => localStorage.getItem('bussy_bee_particular_cust_addr') || '');
+  const [customerState, setCustomerState] = useState<string>(() => localStorage.getItem('bussy_bee_particular_cust_state') || 'Tamil Nadu');
+  const [transportName, setTransportName] = useState<string>(() => localStorage.getItem('bussy_bee_particular_transport') || '');
+  const [customerPhone, setCustomerPhone] = useState<string>(() => localStorage.getItem('bussy_bee_particular_cust_phone') || '');
+  const [customerGst, setCustomerGst] = useState<string>(() => localStorage.getItem('bussy_bee_particular_cust_gst') || '');
   const [discount, setDiscount] = useState<string>('');
   const [billNo, setBillNo] = useState<string>('');
   const [tax, setTax] = useState<string>('');
@@ -411,14 +411,14 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   useEffect(() => {
     if (initialSubTab) {
       setActiveSubTab(initialSubTab);
-      localStorage.setItem('dheeksha_particular_subtab', initialSubTab);
+      localStorage.setItem('bussy_bee_particular_subtab', initialSubTab);
     }
   }, [initialSubTab]);
 
   // Persist activeSubTab whenever it changes
   useEffect(() => {
     if (activeSubTab) {
-      localStorage.setItem('dheeksha_particular_subtab', activeSubTab);
+      localStorage.setItem('bussy_bee_particular_subtab', activeSubTab);
     }
   }, [activeSubTab]);
 
@@ -469,24 +469,24 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
             phone: c.phone || c.mobile || '',
           }));
 
-          const savedComp = localStorage.getItem('dheeksha_particular_company');
+          const savedComp = localStorage.getItem('bussy_bee_particular_company');
           if (savedComp) {
             const matched = mapped.find((c: any) => c.name.toLowerCase() === savedComp.toLowerCase());
             if (matched) {
               setCompany(matched.name);
-              setCompanyAddress(matched.address || localStorage.getItem('dheeksha_particular_comp_addr') || '');
-              setCompanyGst(matched.gstin || localStorage.getItem('dheeksha_particular_comp_gst') || '');
-              setCompanyPhone(matched.phone || localStorage.getItem('dheeksha_particular_comp_phone') || '');
+              setCompanyAddress(matched.address || localStorage.getItem('bussy_bee_particular_comp_addr') || '');
+              setCompanyGst(matched.gstin || localStorage.getItem('bussy_bee_particular_comp_gst') || '');
+              setCompanyPhone(matched.phone || localStorage.getItem('bussy_bee_particular_comp_phone') || '');
             }
           } else if (mapped.length > 0) {
             setCompany(mapped[0].name);
             setCompanyAddress(mapped[0].address || '');
             setCompanyGst(mapped[0].gstin || '');
             setCompanyPhone(mapped[0].phone || '');
-            localStorage.setItem('dheeksha_particular_company', mapped[0].name);
-            localStorage.setItem('dheeksha_particular_comp_addr', mapped[0].address || '');
-            localStorage.setItem('dheeksha_particular_comp_gst', mapped[0].gstin || '');
-            localStorage.setItem('dheeksha_particular_comp_phone', mapped[0].phone || '');
+            localStorage.setItem('bussy_bee_particular_company', mapped[0].name);
+            localStorage.setItem('bussy_bee_particular_comp_addr', mapped[0].address || '');
+            localStorage.setItem('bussy_bee_particular_comp_gst', mapped[0].gstin || '');
+            localStorage.setItem('bussy_bee_particular_comp_phone', mapped[0].phone || '');
           }
         }
 
@@ -858,7 +858,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
       setDiscount('');
       setTax('');
       setTransportName('');
-      localStorage.removeItem('dheeksha_particular_transport');
+      localStorage.removeItem('bussy_bee_particular_transport');
       fetchAccounts(accountFilterCustomer);
       fetchParticulars('ALL');
       setParticularFilterCustomer('ALL');
@@ -1505,10 +1505,10 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                       setCustomerAddress(val.address || '');
                       setCustomerPhone(val.mobile || '');
                       setCustomerGst(val.gst || '');
-                      localStorage.setItem('dheeksha_active_customer', val.name);
-                      if (val.address) localStorage.setItem('dheeksha_particular_cust_addr', val.address);
-                      if (val.mobile) localStorage.setItem('dheeksha_particular_cust_phone', val.mobile);
-                      if (val.gst) localStorage.setItem('dheeksha_particular_cust_gst', val.gst);
+                      localStorage.setItem('bussy_bee_active_customer', val.name);
+                      if (val.address) localStorage.setItem('bussy_bee_particular_cust_addr', val.address);
+                      if (val.mobile) localStorage.setItem('bussy_bee_particular_cust_phone', val.mobile);
+                      if (val.gst) localStorage.setItem('bussy_bee_particular_cust_gst', val.gst);
                     } else {
                       setSelectedCustomerId('');
                       setCurrentCustomerName('');
@@ -1516,10 +1516,10 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                       setCustomerAddress('');
                       setCustomerPhone('');
                       setCustomerGst('');
-                      localStorage.removeItem('dheeksha_active_customer');
-                      localStorage.removeItem('dheeksha_particular_cust_addr');
-                      localStorage.removeItem('dheeksha_particular_cust_phone');
-                      localStorage.removeItem('dheeksha_particular_cust_gst');
+                      localStorage.removeItem('bussy_bee_active_customer');
+                      localStorage.removeItem('bussy_bee_particular_cust_addr');
+                      localStorage.removeItem('bussy_bee_particular_cust_phone');
+                      localStorage.removeItem('bussy_bee_particular_cust_gst');
                     }
                   }}
                   renderInput={(params) => (
@@ -1678,24 +1678,24 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     onChange={(_, val) => {
                       const name = val ? val.name : '';
                       setCurrentCustomerName(name);
-                      localStorage.setItem('dheeksha_active_customer', name);
+                      localStorage.setItem('bussy_bee_active_customer', name);
                       if (val) {
                         setSelectedCustomerId(val.id);
                         setAddCreditCustomerName(val.name);
                         setCustomerAddress(val.address || '');
                         setCustomerPhone(val.mobile || '');
                         setCustomerGst(val.gst || '');
-                        if (val.address) localStorage.setItem('dheeksha_particular_cust_addr', val.address);
-                        if (val.mobile) localStorage.setItem('dheeksha_particular_cust_phone', val.mobile);
-                        if (val.gst) localStorage.setItem('dheeksha_particular_cust_gst', val.gst);
+                        if (val.address) localStorage.setItem('bussy_bee_particular_cust_addr', val.address);
+                        if (val.mobile) localStorage.setItem('bussy_bee_particular_cust_phone', val.mobile);
+                        if (val.gst) localStorage.setItem('bussy_bee_particular_cust_gst', val.gst);
                       } else {
                         setSelectedCustomerId('');
                         setCustomerAddress('');
                         setCustomerPhone('');
                         setCustomerGst('');
-                        localStorage.removeItem('dheeksha_particular_cust_addr');
-                        localStorage.removeItem('dheeksha_particular_cust_phone');
-                        localStorage.removeItem('dheeksha_particular_cust_gst');
+                        localStorage.removeItem('bussy_bee_particular_cust_addr');
+                        localStorage.removeItem('bussy_bee_particular_cust_phone');
+                        localStorage.removeItem('bussy_bee_particular_cust_gst');
                       }
                     }}
                     renderInput={(params) => (
@@ -1733,7 +1733,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     value={customerPhone}
                     onChange={(e) => {
                       setCustomerPhone(e.target.value);
-                      localStorage.setItem('dheeksha_particular_cust_phone', e.target.value);
+                      localStorage.setItem('bussy_bee_particular_cust_phone', e.target.value);
                     }}
                     slotProps={{
                       input: {
@@ -1765,7 +1765,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     value={customerAddress}
                     onChange={(e) => {
                       setCustomerAddress(e.target.value);
-                      localStorage.setItem('dheeksha_particular_cust_addr', e.target.value);
+                      localStorage.setItem('bussy_bee_particular_cust_addr', e.target.value);
                     }}
                     slotProps={{
                       input: {
@@ -1796,7 +1796,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     value={customerState}
                     onChange={(e) => {
                       setCustomerState(e.target.value);
-                      localStorage.setItem('dheeksha_particular_cust_state', e.target.value);
+                      localStorage.setItem('bussy_bee_particular_cust_state', e.target.value);
                     }}
                     slotProps={{
                       input: {
@@ -1827,7 +1827,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     value={transportName}
                     onChange={(e) => {
                       setTransportName(e.target.value);
-                      localStorage.setItem('dheeksha_particular_transport', e.target.value);
+                      localStorage.setItem('bussy_bee_particular_transport', e.target.value);
                     }}
                     slotProps={{
                       input: {
@@ -1858,7 +1858,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     value={customerGst}
                     onChange={(e) => {
                       setCustomerGst(e.target.value);
-                      localStorage.setItem('dheeksha_particular_cust_gst', e.target.value);
+                      localStorage.setItem('bussy_bee_particular_cust_gst', e.target.value);
                     }}
                     slotProps={{
                       input: {

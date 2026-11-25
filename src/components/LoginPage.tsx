@@ -71,9 +71,9 @@ export const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
       });
 
       if (res && res.token) {
-        localStorage.setItem('dheeksha_auth_token', res.token);
+        localStorage.setItem('bussy_bee_auth_token', res.token);
         localStorage.setItem(
-          'dheeksha_auth_user',
+          'bussy_bee_auth_user',
           JSON.stringify(res.user || { username: targetUser, role: selectedRole })
         );
         onLoginSuccess(res.user || { username: targetUser, role: selectedRole });

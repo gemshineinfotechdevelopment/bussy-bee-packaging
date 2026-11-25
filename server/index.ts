@@ -31,7 +31,7 @@ import settingRoutes from './routes/settingRoutes';
 import { seedDefaultAdmin } from './controllers/authController';
 
 const app: Application = express();
-const PORT = process.env.PORT || 5004;
+const PORT = process.env.PORT || 5035;
 
 // Connect Database & Seed default admin
 connectDB().then(() => {
@@ -46,6 +46,10 @@ const envOrigins = (process.env.CORS_ORIGIN || '')
 
 const allowedOrigins = [
   ...envOrigins,
+  'https://bussy-bee.gemshine.tech',
+  'http://bussy-bee.gemshine.tech',
+  'http://localhost:5035',
+  'http://127.0.0.1:5035',
   'http://localhost:5000',
   'http://127.0.0.1:5000',
   'http://localhost:5173',

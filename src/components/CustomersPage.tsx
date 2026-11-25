@@ -66,7 +66,7 @@ export const CustomersPage: FC<CustomersPageProps> = ({ currentUser, onAddNew, o
     currentUser?.role ||
     (() => {
       try {
-        const u = localStorage.getItem('dheeksha_auth_user');
+        const u = localStorage.getItem('bussy_bee_auth_user');
         return u ? JSON.parse(u)?.role : 'admin';
       } catch {
         return 'admin';
@@ -181,8 +181,8 @@ export const CustomersPage: FC<CustomersPageProps> = ({ currentUser, onAddNew, o
       const deletedCust = customers.find((c) => (c._id || c.id) === id);
       await CustomersApi.delete(id);
       setCustomers((prev) => prev.filter((c) => (c._id || c.id) !== id));
-      if (deletedCust && localStorage.getItem('dheeksha_active_customer') === deletedCust.name) {
-        localStorage.removeItem('dheeksha_active_customer');
+      if (deletedCust && localStorage.getItem('bussy_bee_active_customer') === deletedCust.name) {
+        localStorage.removeItem('bussy_bee_active_customer');
       }
     } catch (err) {
       console.error('Failed to delete customer:', err);

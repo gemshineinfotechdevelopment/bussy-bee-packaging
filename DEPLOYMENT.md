@@ -8,13 +8,13 @@ This guide walks you through deploying the complete **Bussy Bee Packaging** full
 
 | Component | Technology | VPS Internal Port | Public URL / Port |
 | :--- | :--- | :--- | :--- |
-| **Web Server / Reverse Proxy** | Nginx | `5035` | **`http://<your-domain-or-vps-ip>:5035`** |
+| **Web Server / Reverse Proxy** | Nginx | `80` & `443` (SSL) | **`https://bussy-bee.gemshine.tech`** |
 | **Frontend UI (Static)** | React + Vite (`dist/`) | Static `/var/www/bussy-bee/dist` | Served by Nginx directly |
-| **Backend API Server** | Node.js + Express (PM2) | `5004` (Internal) | Proxied by Nginx via `/api/` |
+| **Backend API Server** | Node.js + Express (PM2) | `5035` (Internal) | Proxied by Nginx via `/api/` |
 | **Database** | MongoDB Community | `27017` (Local only) | `mongodb://127.0.0.1:27017/bussy_bee` |
 
 > [!NOTE]
-> **Zero CORS & Zero Port Mismatch**: Nginx listens on **Port 5035**. When a user visits `http://bussy-bee:5035`, Nginx serves the frontend. When the frontend sends requests to `/api/*`, Nginx transparently forwards them to the PM2 backend on `http://127.0.0.1:5004`. Everything operates under the single port `5035`.
+> **Zero CORS & Clean Architecture**: Nginx listens on **Port 80/443** for `bussy-bee.gemshine.tech`. When a user visits the URL, Nginx serves the frontend. When the frontend sends requests to `/api/*`, Nginx transparently forwards them to the PM2 backend on `http://127.0.0.1:5035`.
 
 ---
 

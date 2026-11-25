@@ -23,10 +23,10 @@ if [ ! -f "server/.env" ]; then
     cp server/.env.production server/.env
   else
     echo "Creating default server/.env..."
-    echo "PORT=5004" > server/.env
+    echo "PORT=5035" > server/.env
     echo "NODE_ENV=production" >> server/.env
     echo "MONGODB_URI=mongodb://127.0.0.1:27017/bussy_bee" >> server/.env
-    echo "CORS_ORIGIN=*" >> server/.env
+    echo "CORS_ORIGIN=https://bussy-bee.gemshine.tech" >> server/.env
   fi
 fi
 

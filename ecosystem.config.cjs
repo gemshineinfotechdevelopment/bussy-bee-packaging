@@ -26,11 +26,11 @@ module.exports = {
       // Environment variables passed to backend
       env: {
         NODE_ENV: 'development',
-        PORT: 5004,
+        PORT: 5035,
       },
       env_production: {
         NODE_ENV: 'production',
-        PORT: 5004,
+        PORT: 5035,
         MONGODB_URI: 'mongodb://127.0.0.1:27017/bussy_bee',
       },
 

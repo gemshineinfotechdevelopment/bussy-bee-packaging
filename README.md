@@ -7,7 +7,7 @@ Bussy Bee is a billing and inventory management application built with **React (
 ## 📁 Project Structure
 
 ```text
-Dheeksha-trade/                      # Root Project Directory (Frontend + Monorepo root)
+bussy-bee/                          # Root Project Directory (Frontend + Monorepo root)
 ├── index.html                       # Frontend HTML entry point
 ├── package.json                     # Frontend & Root scripts configuration
 ├── vite.config.ts                   # Vite configuration
@@ -55,7 +55,7 @@ Dheeksha-trade/                      # Root Project Directory (Frontend + Monore
 
 ## ⚡ How to Run the Application
 
-> **Note:** Always run npm commands from the project root (`Dheeksha-trade`), **do not `cd src`**!
+> **Note:** Always run npm commands from the project root (`bussy-bee`), **do not `cd src`**!
 
 ### 1. Run Both Frontend & Backend Together (Recommended)
 From the root directory:

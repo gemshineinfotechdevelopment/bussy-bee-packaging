@@ -1,8 +1,10 @@
-# Bussy Bee - VPS Deployment Guide (Ubuntu)
+# Bussy Bee - Complete VPS Deployment Guide (Ubuntu)
 
-Target Domain / Subdomain: `dheeksha-trade.gemshine.tech`  
-Backend Port: `5004`  
-Database: Local MongoDB on VPS (`mongodb://127.0.0.1:27017/dheeksha_trade`)
+Target Domain / Subdomain: `bussy-bee.gemshine.tech`  
+Backend Port: `5035`  
+Database: Local MongoDB on VPS (`mongodb://127.0.0.1:27017/bussy_bee`)  
+Reverse Proxy: Nginx (Port 80 HTTP / Port 443 HTTPS)  
+Process Manager: PM2 (`ecosystem.config.cjs`)  
 
 ---
 
@@ -11,31 +13,31 @@ Database: Local MongoDB on VPS (`mongodb://127.0.0.1:27017/dheeksha_trade`)
 ```
                       Internet (Client Browser)
                                  │
-                                 ▼
+                                 ▼ https://bussy-bee.gemshine.tech
                      [ Nginx Reverse Proxy ] (Ports 80 & 443 SSL)
-                     (dheeksha-trade.gemshine.tech)
                                  │
             ┌────────────────────┴────────────────────┐
             │                                         │
      Static Frontend                           Backend API
-    (/var/www/dheeksha-trade/dist)       (http://127.0.0.1:5004/api)
+    (/var/www/bussy-bee/dist)            (http://127.0.0.1:5035/api)
                                                       │
-                                           ┌──────────┴──────────┐
-                                           ▼                     ▼
-                                    Local MongoDB           Cloudinary
-                             (127.0.0.1:27017)
+                                            ┌──────────┴──────────┐
+                                            ▼                     ▼
+                                     Local MongoDB           Cloudinary
+                                   (127.0.0.1:27017)
+                                 Database: bussy_bee
 ```
 
 ---
 
 ## 📋 Step 1: VPS Server Setup & Essential Tools
 
-Connect to your VPS:
+Connect to your VPS terminal:
 ```bash
 ssh root@YOUR_VPS_IP
 ```
 
-Update packages and install basic utilities:
+Update packages and install basic system utilities:
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y git curl wget gnupg ufw nginx build-essential
@@ -58,129 +60,147 @@ sudo npm install -g pm2
 
 ## 🍃 Step 2: Install and Start MongoDB on VPS
 
-### 2.1 Install MongoDB Community Edition (Ubuntu 22.04 / 24.04):
+### 2.1 Install MongoDB Community Edition (Ubuntu 20.04 / 22.04 / 24.04):
 
 ```bash
 # Import MongoDB public GPG Key
 curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
   sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor --yes
 
-# Add MongoDB repository for Ubuntu
-echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/7.0 multiverse" | \
+# Add MongoDB repository
+UBUNTU_CODENAME=$(lsb_release -cs)
+[ "$UBUNTU_CODENAME" = "noble" ] && REPO_RELEASE="jammy" || REPO_RELEASE="$UBUNTU_CODENAME"
+echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${REPO_RELEASE}/mongodb-org/7.0 multiverse" | \
   sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
 
-# Update repository lists & install MongoDB
+# Update & Install MongoDB
 sudo apt update
 sudo apt install -y mongodb-org
 ```
 
-*(Note: If your Ubuntu version already provides `mongodb`, you can also verify using `mongod --version`).*
+*(Or simply run the included automated script: `bash deploy/setup-mongodb.sh`)*
 
 ### 2.2 Start and Enable MongoDB Service:
 ```bash
-sudo systemctl start mongod
+sudo systemctl daemon-reload
 sudo systemctl enable mongod
+sudo systemctl start mongod
 sudo systemctl status mongod
 ```
-MongoDB will now run on `127.0.0.1:27017` and start automatically on boot.
+MongoDB will now run locally on `127.0.0.1:27017` and restart automatically on system reboot.
+
+### 2.3 Creating the Database (`bussy_bee`):
+MongoDB automatically creates the `bussy_bee` database as soon as the first collection and data are inserted.
+You can verify or manually interact using `mongosh`:
+```bash
+mongosh
+```
+Inside the MongoDB shell:
+```javascript
+use bussy_bee
+db.createCollection("init_check")
+show dbs
+exit
+```
+
+*(Note: When you run `npm --prefix server run seed` in Step 5, it automatically connects to `mongodb://127.0.0.1:27017/bussy_bee` and populates all initial collections, default admin account, and default configurations).*
 
 ---
 
 ## 📂 Step 3: Clone Project & Prepare Web Directory
 
 ```bash
-sudo mkdir -p /var/www/dheeksha-trade
-sudo chown -R $USER:$USER /var/www/dheeksha-trade
-cd /var/www/dheeksha-trade
+sudo mkdir -p /var/www/bussy-bee
+sudo chown -R $USER:$USER /var/www/bussy-bee
+cd /var/www/bussy-bee
 
-git clone https://github.com/gemshineinfotechdevelopment/dheeksha-trade.git .
+git clone https://github.com/gemshineinfotechdevelopment/bussy-bee-packaging.git .
 ```
 
 ---
 
 ## ⚙️ Step 4: Configure Environment Files
 
-### 4.1 Frontend `.env` (in `/var/www/dheeksha-trade`):
+### 4.1 Frontend `.env` (in `/var/www/bussy-bee`):
 ```bash
 nano .env
 ```
-Add:
+Ensure it contains:
 ```env
 VITE_API_URL=/api
 ```
 *(Save: `Ctrl + O` -> `Enter`, Exit: `Ctrl + X`)*
 
-### 4.2 Backend `server/.env` (in `/var/www/dheeksha-trade/server`):
+### 4.2 Backend `server/.env` (in `/var/www/bussy-bee/server`):
 ```bash
 nano server/.env
 ```
 Paste the following:
 ```env
-PORT=5004
+PORT=5035
 NODE_ENV=production
-MONGODB_URI=mongodb://127.0.0.1:27017/dheeksha_trade
-CORS_ORIGIN=https://dheeksha-trade.gemshine.tech
+MONGODB_URI=mongodb://127.0.0.1:27017/bussy_bee
+CORS_ORIGIN=https://bussy-bee.gemshine.tech,http://bussy-bee.gemshine.tech,http://localhost:5035
 CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 ```
-*(Fill in your Cloudinary keys if file/PDF uploads are used).*
+*(Save: `Ctrl + O` -> `Enter`, Exit: `Ctrl + X`)*
 
 ---
 
-## 🔨 Step 5: Install Dependencies & Build Application
+## 🔨 Step 5: Install Dependencies, Seed Database & Build Application
 
-From the root directory `/var/www/dheeksha-trade`:
+From the project root `/var/www/bussy-bee`:
 ```bash
-cd /var/www/dheeksha-trade
+cd /var/www/bussy-bee
 
-# Install Frontend & Backend Dependencies
+# 1. Install Frontend & Backend Dependencies
 npm install
 npm --prefix server install
 
-# Build both React Vite and Backend TypeScript
-npm run build:all
-```
-
-*(Optional: If you want to seed initial dummy/admin data)*
-```bash
+# 2. Seed Default Database Data & Admin Account
 npm --prefix server run seed
+
+# 3. Build both React Vite and Backend TypeScript
+npm run build:all
 ```
 
 ---
 
 ## 🚀 Step 6: Start Backend with PM2
 
-Start the Node API server on port 5004:
+Start the Node.js Express server on port 5035 using PM2 ecosystem:
 ```bash
-cd /var/www/dheeksha-trade
-pm2 start ecosystem.config.cjs
+cd /var/www/bussy-bee
+pm2 start ecosystem.config.cjs --env production
 pm2 save
 pm2 startup
 ```
-*(Copy and run the `sudo env PATH=...` command shown on screen by `pm2 startup` if required).*
+*(Copy and run the `sudo env PATH=...` command shown on screen by `pm2 startup` if prompted).*
 
-Check status:
+Check PM2 process health:
 ```bash
 pm2 status
-pm2 logs dheeksha-trade-api --lines 20
+pm2 logs bussy-bee-api --lines 20
 ```
 
 ---
 
 ## 🌐 Step 7: Configure Nginx & DNS
 
-### 7.1 DNS Record (Hostinger / Cloudflare / Domain Registrar)
-Add an **A Record** in your DNS management for `gemshine.tech`:
+### 7.1 DNS Record (Hostinger / Cloudflare / GoDaddy / Your Domain Registrar)
+Add an **A Record** in your DNS zone for `gemshine.tech`:
 - **Type**: `A`
-- **Name / Host**: `dheeksha-trade`
+- **Name / Host**: `bussy-bee`
 - **Points to / Value**: `YOUR_VPS_IP`
-- **TTL**: `Auto` or `300`
+- **TTL**: `Auto` (or `300` / `600`)
 
 ### 7.2 Configure Nginx:
 ```bash
-sudo cp /var/www/dheeksha-trade/nginx/dheeksha-trade.conf /etc/nginx/sites-available/dheeksha-trade
-sudo ln -sf /etc/nginx/sites-available/dheeksha-trade /etc/nginx/sites-enabled/
+sudo cp /var/www/bussy-bee/nginx/bussy-bee.conf /etc/nginx/sites-available/bussy-bee
+sudo ln -sf /etc/nginx/sites-available/bussy-bee /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl restart nginx
 ```
@@ -192,24 +212,31 @@ sudo systemctl restart nginx
 ### 8.1 Firewall:
 ```bash
 sudo ufw allow OpenSSH
-sudo ufw allow 'Nginx Full'
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
 sudo ufw --force enable
+sudo ufw status
 ```
 
-### 8.2 SSL Certificate:
+### 8.2 Install Free SSL Certificate with Certbot:
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d dheeksha-trade.gemshine.tech
+sudo certbot --nginx -d bussy-bee.gemshine.tech
 ```
-Follow prompts, enter your email, and accept terms. Certbot will configure SSL and automatic renewal automatically.
+Follow the interactive prompt:
+1. Enter your email address for renewal notices.
+2. Accept the terms of service (`Y`).
+3. Choose redirect HTTP to HTTPS (`Yes` / option 2 if asked).
+
+Certbot will automatically install SSL and test auto-renewal.
 
 ---
 
 ## 🔄 Step 9: Automatic Future Deployments (1 Command)
 
-Whenever you push new changes to GitHub:
+Whenever you push new code to GitHub, simply SSH into your VPS and run:
 ```bash
-cd /var/www/dheeksha-trade
+cd /var/www/bussy-bee
 bash deploy.sh
 ```
-This single command pulls new code, installs dependencies, builds frontend & backend, and reloads PM2 with zero hassle.
+This single command automatically pulls latest code, installs dependencies, rebuilds frontend & backend, and reloads PM2 with zero downtime!

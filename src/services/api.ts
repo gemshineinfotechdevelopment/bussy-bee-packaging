@@ -20,7 +20,7 @@ const getApiBaseUrl = (): string => {
 
   // Safe development fallback: ONLY used during local `vite dev`
   if (import.meta.env.DEV) {
-    return 'http://localhost:5004/api';
+    return 'http://localhost:5035/api';
   }
 
   // In production builds when no environment variable is provided,
@@ -44,7 +44,9 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const url = `${API_BASE_URL}${normalizedEndpoint}`;
 
   // Retrieve auth token if stored
-  const token = typeof window !== 'undefined' ? localStorage.getItem('dheeksha_auth_token') : null;
+  const token = typeof window !== 'undefined'
+    ? localStorage.getItem('bussy_bee_auth_token')
+    : null;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
