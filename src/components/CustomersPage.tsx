@@ -284,7 +284,8 @@ export const CustomersPage: FC<CustomersPageProps> = ({ currentUser, onAddNew, o
           sx={{
             display: 'flex',
             flexDirection: { xs: 'column', sm: 'row' },
-            alignItems: 'stretch',
+            alignItems: { xs: 'stretch', sm: 'center' },
+            flexWrap: 'wrap',
             gap: 1.5,
             width: { xs: '100%', md: 'auto' },
           }}
@@ -299,7 +300,8 @@ export const CustomersPage: FC<CustomersPageProps> = ({ currentUser, onAddNew, o
               border: '1px solid #E2E8F0',
               px: 1.5,
               height: '38px',
-              width: { xs: '100%', sm: '260px' },
+              width: { xs: '100%', sm: '240px', md: '260px' },
+              flexShrink: 0,
               boxSizing: 'border-box',
               transition: 'border-color 0.2s',
               '&:hover': {
@@ -344,6 +346,8 @@ export const CustomersPage: FC<CustomersPageProps> = ({ currentUser, onAddNew, o
               alignItems: 'center',
               gap: 1.2,
               width: { xs: '100%', sm: 'auto' },
+              flexWrap: 'wrap',
+              flexShrink: 0,
             }}
           >
             {/* Print Customers List Button with Date Range Filter */}

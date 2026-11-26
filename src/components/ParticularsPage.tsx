@@ -1027,16 +1027,42 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   // WhatsApp Share Handlers
   const handleShareBillWhatsApp = async (billData: any) => {
     try {
+      const targetCustomer = customerOptions.find(
+        (c) => c.name.toLowerCase() === (billData.customerName || currentCustomerName || '').toLowerCase()
+      );
+      const custPhone = billData.customerMobile || billData.customerPhone || targetCustomer?.mobile || '';
+      const custAddress = targetCustomer?.address || billData.customerAddress || '';
+      const custGst = targetCustomer?.gst || billData.customerGst || '';
+
+      const compName = 'BUSSY BEE';
+      const compAddr = billData.traderAddress || billData.companyAddress || '';
+      const compGst = billData.traderGst || billData.companyGst || '';
+      const compPhone = billData.traderPhone || billData.companyPhone || '';
+
       const formattedBill: BillPrintData = {
+        id: billData._id || billData.id || '',
+        _id: billData._id || billData.id || '',
         billNo: billData.billNo || '',
-        customerName: billData.customerName || 'General',
-        companyName: billData.companyName || '',
-        preparedBy: 'S.Nagaraj',
-        phone: billData.phone || '+91 98765 43210',
+        customerName: billData.customerName || currentCustomerName || 'General',
+        customerAddress: custAddress,
+        customerGst: custGst,
+        customerMobile: custPhone,
+        customerPhone: custPhone,
+        customerState: billData.customerState || 'Tamil Nadu',
+        companyName: compName,
+        companyAddress: compAddr,
+        companyGst: compGst,
+        companyPhone: compPhone,
+        traderName: compName,
+        traderAddress: compAddr,
+        traderGst: compGst,
+        traderPhone: compPhone,
+        preparedBy: billData.preparedBy || 'Admin',
+        phone: compPhone || custPhone || '+91 98765 43210',
         email: 'info@bussybee.com',
         website: 'www.bussybee.com',
         transport: billData.transport && billData.transport !== '-' ? billData.transport : '-',
-        caseCount: billData.caseCount || '0',
+        caseCount: billData.caseCount || billData.cases || (billData.products ? billData.products.reduce((acc: number, p: any) => acc + (parseFloat(p.quantity) || 0), 0) : 0),
         date: billData.date || new Date().toISOString().split('T')[0],
         products: (billData.products || []).map((p: any) => ({
           particular: p.particular || p.particularName || p.name || 'Product',
@@ -1046,13 +1072,13 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
           pktUnit: p.pktUnit || p.pkt || '-',
           amount: String(p.amount || '0'),
         })),
-        amount: billData.amount || '0.00',
+        amount: billData.amount || billData.total || '0.00',
         discount: billData.discount !== undefined && billData.discount !== null ? String(billData.discount) : '0',
         packing: billData.packing !== undefined && billData.packing !== null ? String(billData.packing) : '0',
         tax: billData.tax !== undefined && billData.tax !== null ? String(billData.tax) : '0',
         total: billData.total || billData.amount || '0.00',
       };
-      await shareBillOnWhatsApp(formattedBill);
+      await shareBillOnWhatsApp(formattedBill, custPhone);
     } catch (err) {
       console.error('Failed to share bill on WhatsApp:', err);
     }
@@ -1069,8 +1095,9 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
 
   const handleShareLedgerWhatsApp = async () => {
     try {
-      const cust = accountFilterCustomer && accountFilterCustomer !== 'ALL' ? accountFilterCustomer : 'All Customers';
-      await shareLedgerOnWhatsApp(cust, sortedAccountDetails);
+      const cust = accountFilterCustomer && accountFilterCustomer !== 'ALL' ? accountFilterCustomer : currentCustomerName;
+      const targetCustomer = customerOptions.find((c) => c.name.toLowerCase() === (cust || '').toLowerCase());
+      await shareLedgerOnWhatsApp(cust, sortedAccountDetails, undefined, undefined, targetCustomer?.mobile);
     } catch (err) {
       console.error('Failed to share ledger on WhatsApp:', err);
     }

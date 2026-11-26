@@ -379,7 +379,8 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
           sx={{
             display: 'flex',
             flexDirection: { xs: 'column', sm: 'row' },
-            alignItems: 'stretch',
+            alignItems: { xs: 'stretch', sm: 'center' },
+            flexWrap: 'wrap',
             gap: 1.5,
             width: { xs: '100%', md: 'auto' },
           }}
@@ -394,7 +395,8 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
               border: '1px solid #E2E8F0',
               px: 1.5,
               height: '38px',
-              width: { xs: '100%', sm: '260px' },
+              width: { xs: '100%', sm: '240px', md: '260px' },
+              flexShrink: 0,
               boxSizing: 'border-box',
               boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
               transition: 'all 0.2s',
@@ -441,6 +443,8 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
               alignItems: 'center',
               gap: 1.2,
               width: { xs: '100%', sm: 'auto' },
+              flexWrap: 'wrap',
+              flexShrink: 0,
             }}
           >
             {/* Print All / Filtered Customers Report Button with Date Range Filter */}

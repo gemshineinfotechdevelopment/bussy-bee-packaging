@@ -6,6 +6,7 @@ import {
   generateCustomerListPrintHtml,
 } from './printUtils';
 import type { BillPrintData } from '../components/BillPrintTemplate';
+import { numberToWords } from '../components/BillPrintTemplate';
 
 /**
  * Normalizes phone numbers for WhatsApp (adds 91 if 10-digit Indian number)
@@ -138,7 +139,32 @@ export const shareToWhatsApp = async (options: {
     pdfFile = await generatePdfBlobFromHtml(html, cleanFileName);
   }
 
-  // 1. Try Native Web Share API if device/browser supports file sharing (Mobile, Tablets, Mac/Windows Edge)
+  // 1. If a specific customer phone number is provided, ALWAYS open direct WhatsApp chat to that customer!
+  // Web Share API does NOT support targeting recipient phone numbers, so calling navigator.share
+  // forces users to search contacts manually and loses the targeted customer number.
+  if (cleanPhone) {
+    if (pdfFile) {
+      try {
+        const blobUrl = URL.createObjectURL(pdfFile);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = blobUrl;
+        downloadLink.download = cleanFileName;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      } catch (dErr) {
+        console.warn('[Direct PDF Download fallback failed]:', dErr);
+      }
+    }
+
+    const encodedText = encodeURIComponent(text);
+    const waUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
+    window.open(waUrl, '_blank');
+    return;
+  }
+
+  // 2. Try Native Web Share API if device/browser supports file sharing and NO phone is targeted
   if (pdfFile && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
     try {
       await navigator.share({
@@ -156,8 +182,7 @@ export const shareToWhatsApp = async (options: {
     }
   }
 
-  // 2. Direct PDF Download fallback for Desktop browsers:
-  // Automatically saves the exact generated PDF to Downloads so the user can easily attach it in WhatsApp Web
+  // 3. Direct PDF Download fallback for Desktop browsers:
   if (pdfFile) {
     try {
       const blobUrl = URL.createObjectURL(pdfFile);
@@ -173,57 +198,125 @@ export const shareToWhatsApp = async (options: {
     }
   }
 
-  // 3. WhatsApp URL fallback (Desktop Web / Mobile App deep link)
+  // 4. General WhatsApp URL fallback
   const encodedText = encodeURIComponent(text);
-  const waUrl = cleanPhone
-    ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`
-    : `https://api.whatsapp.com/send?text=${encodedText}`;
-
+  const waUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
   window.open(waUrl, '_blank');
 };
 
 /**
- * 1. Share Particular Bill on WhatsApp
+ * 1. Share Particular Bill on WhatsApp matching exact printed invoice format
  */
 export const shareBillOnWhatsApp = async (bill: BillPrintData, phone?: string) => {
-  const itemsText = (bill.products || [])
-    .map(
-      (p, i) =>
-        `${i + 1}. *${p.particular}* - ${p.quantity} Cases @ ₹${p.rate}${p.pktUnit && p.pktUnit !== '-' ? ` (${p.pktUnit}/pkt)` : ''} = *₹${p.amount}*`
-    )
-    .join('\n');
+  // Target customer's phone number
+  const targetPhone = phone || bill.customerMobile || bill.customerPhone || '';
 
-  const rawDisc = parseFloat(String(bill.discount || '0').replace(/[^0-9.]/g, '')) || 0;
-  const rawPack = parseFloat(String(bill.packing || '0').replace(/[^0-9.]/g, '')) || 0;
-  const rawTax = parseFloat(String(bill.tax || '0').replace(/[^0-9.]/g, '')) || 0;
+  // 1. Calculate Subtotal from Products or bill.amount
+  const prodSubtotal = (bill.products || []).reduce((acc, p) => {
+    const amt = parseFloat(String(p.amount).replace(/,/g, '')) || 0;
+    return acc + amt;
+  }, 0);
+  const subtotal = prodSubtotal > 0 ? prodSubtotal : (parseFloat(String(bill.amount || bill.total || '0').replace(/,/g, '')) || 0);
 
-  const text = `*BUSSY BEE - INVOICE BILL* 🧾
-----------------------------------------
-*Bill No:* #${bill.billNo}
-*Customer:* ${bill.customerName}
-${bill.companyName && bill.companyName !== 'General' ? `*Company:* ${bill.companyName}\n` : ''}*Date:* ${bill.date}
-*Transport:* ${bill.transport || '-'}
-*Cases:* ${bill.caseCount || '-'}
-----------------------------------------
+  // 2. Discount calculation
+  const rawDiscStr = String(bill.discount ?? '').trim();
+  const cleanDisc = rawDiscStr.replace(/[^0-9.]/g, '');
+  const discNum = parseFloat(cleanDisc) || 0;
+  let discountAmt = 0;
+  let discountLabel = 'Discount Amount';
+  if (discNum > 0) {
+    const isDiscFlat = rawDiscStr.startsWith('₹') || rawDiscStr.toLowerCase().includes('rs');
+    if (rawDiscStr.includes('%') || (!isDiscFlat && discNum <= 100)) {
+      discountAmt = (subtotal * discNum) / 100;
+      discountLabel = `Discount Amount (${cleanDisc}%)`;
+    } else {
+      discountAmt = discNum;
+      discountLabel = `Discount Amount (₹${discNum.toLocaleString('en-IN')})`;
+    }
+  }
+
+  // 3. Packing calculation
+  const rawPackStr = String(bill.packing ?? '').trim();
+  const cleanPack = rawPackStr.replace(/[^0-9.]/g, '');
+  const packNum = parseFloat(cleanPack) || 0;
+  let packingAmt = 0;
+  let packingLabel = 'Packing Charges';
+  if (packNum > 0) {
+    const baseAfterDiscount = Math.max(0, subtotal - discountAmt);
+    const isPackFlat = rawPackStr.startsWith('₹') || rawPackStr.toLowerCase().includes('rs');
+    if (rawPackStr.includes('%') || (!isPackFlat && packNum <= 100)) {
+      packingAmt = (baseAfterDiscount * packNum) / 100;
+      packingLabel = `Packing Charges (${cleanPack}%)`;
+    } else {
+      packingAmt = packNum;
+      packingLabel = `Packing Charges (₹${packNum.toLocaleString('en-IN')})`;
+    }
+  }
+
+  // 4. Tax calculation
+  const rawTaxStr = String(bill.tax ?? '').trim().replace(/[^0-9.]/g, '');
+  const taxNum = parseFloat(rawTaxStr) || 0;
+  let taxAmt = 0;
+  if (taxNum > 0) {
+    taxAmt = taxNum;
+  }
+
+  // 5. Grand Total calculation
+  const calculatedTotal = Math.max(0, subtotal - discountAmt + packingAmt + taxAmt);
+  const rawTotalNum = parseFloat(String(bill.total ?? bill.amount ?? '0').replace(/,/g, '')) || 0;
+  const finalTotalNum = rawTotalNum > 0 && Math.abs(rawTotalNum - calculatedTotal) < 0.05 ? rawTotalNum : calculatedTotal;
+  const formattedTotal = finalTotalNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const computedCases = bill.caseCount !== undefined && bill.caseCount !== ''
+    ? bill.caseCount
+    : (bill.products || []).reduce((acc, p) => acc + (parseFloat(String(p.quantity)) || 0), 0);
+
+  const custPhone = targetPhone || bill.customerMobile || bill.customerPhone || bill.phone || '';
+  const custAddr = bill.customerAddress && bill.customerAddress.trim() ? bill.customerAddress.trim() : '';
+  const custGst = bill.customerGst && bill.customerGst.trim() ? bill.customerGst.trim() : '';
+
+  // 6. Formatted Product Items matching the printed bill columns: # | Particular | HSN | Counts | Rate | Unit | Amount
+  const itemsText = (bill.products || []).length > 0
+    ? (bill.products || [])
+        .map((p, i) => {
+          const qty = p.quantity || '0';
+          const rateVal = parseFloat(String(p.rate).replace(/,/g, '')) || 0;
+          const amtVal = parseFloat(String(p.amount).replace(/,/g, '')) || 0;
+          const unitStr = p.pktUnit && p.pktUnit !== '-' ? p.pktUnit : 'nos';
+          const hsnStr = p.hsn && p.hsn.trim() !== '' ? ` | HSN: ${p.hsn.trim()}` : '';
+          return `${i + 1}. *${p.particular}*\n   Counts: ${qty}${hsnStr} | Rate: ₹${rateVal.toFixed(2)} | Unit: ${unitStr} | Amount: *₹${amtVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*`;
+        })
+        .join('\n\n')
+    : '-';
+
+  // 7. Full structured message matching BillPrintTemplate layout
+  const text = `*BUSSY BEE - ESTIMATE / INVOICE* 🧾
+========================================
+*Bill No:* #${bill.billNo || '-'}
+*Date:* ${bill.date || '-'}
+*Total Counts:* ${computedCases}
+${custPhone ? `*Phone:* ${custPhone}\n` : ''}========================================
+*BUYER (BILL TO):*
+*Name:* ${bill.customerName || '-'}
+${custAddr ? `*Address:* ${custAddr}\n` : ''}${custGst && custGst !== '-' ? `*GSTIN / UIN:* ${custGst}\n` : ''}*State Name:* ${bill.customerState || 'Tamil Nadu'}, Code: 33
+${bill.transport && bill.transport !== '-' ? `*Transport:* ${bill.transport}\n` : ''}========================================
 *ITEMS:*
-${itemsText || '-'}
-----------------------------------------
-*Subtotal:* ₹${bill.amount || '0.00'}
-*Discount:* ${rawDisc > 0 ? `${bill.discount}${String(bill.discount).includes('%') ? '' : '%'}` : '0%'}
-*Packing:* ${rawPack > 0 ? `${bill.packing}${String(bill.packing).includes('%') ? '' : '%'}` : '0%'}
-*Tax:* ₹${rawTax > 0 ? rawTax.toLocaleString('en-IN') : '0.00'}
-*NET TOTAL:* ₹${bill.total || '0.00'}
-----------------------------------------
+${itemsText}
+========================================
+*Subtotal / Particular Amount:* ₹${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+${discountAmt > 0 ? `*${discountLabel}:* -₹${discountAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` : ''}${packingAmt > 0 ? `*${packingLabel}:* +₹${packingAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` : ''}${taxAmt > 0 ? `*Tax Amount:* +₹${taxAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` : ''}*GRAND TOTAL:* ₹${formattedTotal}
+*Amount in Words:* ${numberToWords(finalTotalNum)}
+========================================
 _Thank you for your business!_
-*Bussy Bee*`;
+*BUSSY BEE*`;
 
   const html = generateBillHtml(bill);
   await shareToWhatsApp({
     title: `Bill #${bill.billNo} - ${bill.customerName}`,
     text,
-    fileName: `Bill-${bill.billNo}-${bill.customerName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+    fileName: `Bill-${bill.billNo}-${(bill.customerName || 'Customer').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
     html,
-    phone: phone || bill.phone,
+    phone: targetPhone,
   });
 };
 

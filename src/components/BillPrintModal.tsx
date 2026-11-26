@@ -94,7 +94,8 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
 
     try {
       setSharing(true);
-      await shareBillOnWhatsApp(currentBillWithTrader);
+      const targetPhone = currentBillWithTrader.customerMobile || currentBillWithTrader.customerPhone || bill?.customerMobile || bill?.customerPhone || '';
+      await shareBillOnWhatsApp(currentBillWithTrader, targetPhone);
     } catch (err) {
       console.error('Failed to share bill on WhatsApp:', err);
     } finally {
@@ -128,6 +129,16 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
             }
             .bussybee-no-print {
               display: none !important;
+            }
+            .bussybee-printable-section input {
+              border: none !important;
+              background-color: transparent !important;
+              box-shadow: none !important;
+              outline: none !important;
+            }
+            .bussybee-printable-section input::placeholder {
+              color: transparent !important;
+              opacity: 0 !important;
             }
             @page {
               size: A4 portrait;
@@ -194,8 +205,8 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
             </Typography>
           </Box>
 
-          {/* Desktop quick action buttons */}
-          <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
+          {/* Desktop quick action buttons (Only on wide screens to prevent overflow on mobile/tablet) */}
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1 }}>
             <Button
               variant="contained"
               disableElevation
@@ -340,7 +351,7 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
           <Button
             onClick={onClose}
             sx={{
-              display: { xs: 'none', sm: 'inline-flex' },
+              display: { xs: 'none', md: 'inline-flex' },
               color: '#64748B',
               fontSize: '13px',
               fontWeight: 600,
@@ -356,7 +367,7 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
               display: 'flex',
               alignItems: 'center',
               gap: 1.2,
-              width: { xs: '100%', sm: 'auto' },
+              width: { xs: '100%', md: 'auto' },
             }}
           >
             <Button
