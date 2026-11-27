@@ -9,6 +9,9 @@ export interface ICustomer extends Document {
   address: string;
   mobile: string;
   gst: string;
+  aadhar?: string;
+  state?: string;
+  pan?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -23,6 +26,9 @@ const CustomerSchema: Schema = new Schema(
     address: { type: String, required: true, trim: true },
     mobile: { type: String, required: true, trim: true },
     gst: { type: String, required: true, trim: true },
+    aadhar: { type: String, default: '', trim: true },
+    state: { type: String, default: 'Tamil Nadu', trim: true },
+    pan: { type: String, default: '', trim: true },
   },
   { timestamps: true }
 );

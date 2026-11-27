@@ -91,7 +91,7 @@ export const getAccountDetails = async (req: Request, res: Response, next: NextF
 
 export const addCredit = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { customerName, companyName, creditAmount, date, paymentMode, reference, notes } = req.body;
+    const { customerName, companyName, creditAmount, date, paymentMode, paymentType, transferredTo, reference, notes } = req.body;
 
     const parsedCredit = parseFloat(String(creditAmount).replace(/,/g, '')) || 0;
     if (parsedCredit <= 0) {
@@ -100,18 +100,27 @@ export const addCredit = async (req: Request, res: Response, next: NextFunction)
     }
 
     const finalCustomerName = (customerName || 'General').trim();
+    const finalPaymentType = paymentType || paymentMode || 'Cash';
+    const finalTransferredTo = transferredTo ? String(transferredTo).trim() : '';
+    const noteDetails = [
+      finalPaymentType ? `Payment: ${finalPaymentType}` : '',
+      finalTransferredTo ? `A/C: ${finalTransferredTo}` : '',
+      notes ? String(notes).trim() : '',
+    ].filter(Boolean).join(' | ');
 
     const ledgerEntry = await AccountLedger.create({
       billNo: reference ? String(reference).trim() : '',
       customerName: finalCustomerName,
-      companyName: companyName ? String(companyName).trim() : 'General',
+      companyName: companyName ? String(companyName).trim() : (finalTransferredTo || 'General'),
       date: date || new Date().toISOString().split('T')[0],
       debit: '0.00',
       credit: parsedCredit.toFixed(2),
       balance: '0.00',
-      paymentMode: paymentMode || 'Bank',
+      paymentMode: finalPaymentType,
+      paymentType: finalPaymentType,
+      transferredTo: finalTransferredTo,
       reference: reference ? String(reference).trim() : '',
-      notes: notes || 'Payment / Credit received',
+      notes: noteDetails || 'Payment / Credit received',
       type: 'CREDIT',
     });
 

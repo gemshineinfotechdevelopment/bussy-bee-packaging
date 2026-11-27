@@ -70,6 +70,10 @@ export const createParticular = async (req: Request, res: Response, next: NextFu
       customerAddress,
       customerPhone,
       customerGst,
+      customerState,
+      customerAadhar,
+      customerPan,
+      bundles,
       caseCount,
       companyName,
       companyAddress,
@@ -81,6 +85,7 @@ export const createParticular = async (req: Request, res: Response, next: NextFu
       traderPhone,
       discount,
       transport,
+      lrNo,
       packing,
       billNo,
       tax,
@@ -106,12 +111,18 @@ export const createParticular = async (req: Request, res: Response, next: NextFu
       finalBillNo = (maxNum + 1).toString().padStart(4, '0');
     }
 
+    const bundleVal = bundles ? String(bundles).trim() : (caseCount ? String(caseCount).trim() : '0');
+
     const particular = await Particular.create({
       customerName: customerName || 'General',
       customerAddress: customerAddress ? String(customerAddress).trim() : '',
       customerPhone: customerPhone ? String(customerPhone).trim() : '',
       customerGst: customerGst ? String(customerGst).trim() : '',
-      caseCount: caseCount || '0',
+      customerState: customerState ? String(customerState).trim() : 'Tamil Nadu',
+      customerAadhar: customerAadhar ? String(customerAadhar).trim() : '',
+      customerPan: customerPan ? String(customerPan).trim() : '',
+      bundles: bundleVal,
+      caseCount: bundleVal,
       companyName: companyName ? String(companyName).trim() : '',
       companyAddress: companyAddress ? String(companyAddress).trim() : '',
       companyGst: companyGst ? String(companyGst).trim() : '',
@@ -122,6 +133,7 @@ export const createParticular = async (req: Request, res: Response, next: NextFu
       traderPhone: traderPhone ? String(traderPhone).trim() : (companyPhone ? String(companyPhone).trim() : ''),
       discount: discount || '0',
       transport: transport || '-',
+      lrNo: lrNo ? String(lrNo).trim() : '',
       packing: packing || '0',
       billNo: finalBillNo,
       tax: tax || '0',
@@ -188,6 +200,7 @@ export const updateParticular = async (req: Request, res: Response, next: NextFu
       traderPhone,
       discount,
       transport,
+      lrNo,
       packing,
       billNo,
       tax,
@@ -215,6 +228,7 @@ export const updateParticular = async (req: Request, res: Response, next: NextFu
         ...(traderPhone !== undefined && { traderPhone }),
         ...(discount !== undefined && { discount }),
         ...(transport !== undefined && { transport }),
+        ...(lrNo !== undefined && { lrNo: String(lrNo).trim() }),
         ...(packing !== undefined && { packing }),
         ...(billNo !== undefined && { billNo: String(billNo).trim() }),
         ...(tax !== undefined && { tax }),

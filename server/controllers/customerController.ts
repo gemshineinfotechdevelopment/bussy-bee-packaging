@@ -243,7 +243,7 @@ export const getCustomerById = async (req: Request, res: Response, next: NextFun
 
 export const createCustomer = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { name, mobile, address, gst, idCode, avatarLetter, avatarBg, avatarColor } = req.body;
+    const { name, mobile, address, gst, aadhar, state, pan, idCode, avatarLetter, avatarBg, avatarColor } = req.body;
 
     const finalIdCode = await getNextCustomerIdCode(idCode);
 
@@ -252,6 +252,9 @@ export const createCustomer = async (req: Request, res: Response, next: NextFunc
       mobile,
       address,
       gst,
+      aadhar: aadhar ? String(aadhar).trim() : '',
+      state: state ? String(state).trim() : 'Tamil Nadu',
+      pan: pan ? String(pan).trim() : '',
       idCode: finalIdCode,
       avatarLetter: avatarLetter || (name ? name.trim().charAt(0).toUpperCase() : ''),
       avatarBg: avatarBg || '#DBEAFE',

@@ -23,6 +23,9 @@ import {
   Snackbar,
   Alert,
   Divider,
+  MenuItem,
+  Select,
+  InputAdornment,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
@@ -56,6 +59,7 @@ import {
 } from '../utils/whatsappUtils';
 import { DateRangePrintModal } from './DateRangePrintModal';
 import { DatePickerField } from './DatePickerField';
+import { INDIAN_STATES, PKT_UNIT_OPTIONS, TAX_PERCENT_OPTIONS } from '../constants/appConstants';
 
 export type ParticularSubTab =
   | 'Select Customer'
@@ -191,7 +195,16 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   }, [isSuperAdmin, activeSubTab]);
 
   // Live Dropdown options
-  const [customerOptions, setCustomerOptions] = useState<{ id: string; name: string; address?: string; gst?: string; mobile?: string }[]>([]);
+  const [customerOptions, setCustomerOptions] = useState<{
+    id: string;
+    name: string;
+    address?: string;
+    gst?: string;
+    mobile?: string;
+    aadhar?: string;
+    state?: string;
+    pan?: string;
+  }[]>([]);
   const [productOptions, setProductOptions] = useState<{ id: string; name: string; code?: string; rate?: number; pktUnit?: string }[]>([]);
 
   // Persistent Selected Customer for Creation & Filter
@@ -231,18 +244,30 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
 
   // Subtab 2: Create Particular Form State
   const [caseCount, setCaseCount] = useState<string>('0');
-  const [company, setCompany] = useState<string>('BUSSY BEE');
-  const [companyAddress, setCompanyAddress] = useState<string>('');
-  const [companyGst, setCompanyGst] = useState<string>('');
-  const [companyPhone, setCompanyPhone] = useState<string>('');
+  const [bundlesQty, setBundlesQty] = useState<string>('0');
+  const [company, setCompany] = useState<string>(
+    () => localStorage.getItem('bussy_bee_company_name') || 'Sri Shanmuga Traders'
+  );
+  const [companyAddress, setCompanyAddress] = useState<string>(
+    () => localStorage.getItem('bussy_bee_company_address') || '352, Amman Kovil Patti Middle Street, Sivakasi - 626123'
+  );
+  const [companyGst, setCompanyGst] = useState<string>(
+    () => localStorage.getItem('bussy_bee_company_gst') || '33BUMPR9147N1ZQ'
+  );
+  const [companyPhone, setCompanyPhone] = useState<string>(
+    () => localStorage.getItem('bussy_bee_company_phone') || ''
+  );
   const [customerAddress, setCustomerAddress] = useState<string>(() => localStorage.getItem('bussy_bee_particular_cust_addr') || '');
   const [customerState, setCustomerState] = useState<string>(() => localStorage.getItem('bussy_bee_particular_cust_state') || 'Tamil Nadu');
   const [transportName, setTransportName] = useState<string>(() => localStorage.getItem('bussy_bee_particular_transport') || '');
+  const [lrNo, setLrNo] = useState<string>(() => localStorage.getItem('bussy_bee_particular_lr_no') || '');
   const [customerPhone, setCustomerPhone] = useState<string>(() => localStorage.getItem('bussy_bee_particular_cust_phone') || '');
   const [customerGst, setCustomerGst] = useState<string>(() => localStorage.getItem('bussy_bee_particular_cust_gst') || '');
-  const [discount, setDiscount] = useState<string>('');
+  const [customerPan, setCustomerPan] = useState<string>(() => localStorage.getItem('bussy_bee_particular_cust_pan') || '');
+  const [packing, setPacking] = useState<string>('');
   const [billNo, setBillNo] = useState<string>('');
   const [tax, setTax] = useState<string>('');
+  const [taxPercent, setTaxPercent] = useState<string>('');
   const [date, setDate] = useState<string>(() => {
     const today = new Date();
     return today.toLocaleDateString('en-GB').replace(/\//g, '-');
@@ -271,7 +296,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   const [hsnCode, setHsnCode] = useState<string>('');
   const [quantity, setQuantity] = useState<string>('');
   const [rate, setRate] = useState<string>('');
-  const [pkt, setPkt] = useState<string>('');
+  const [pkt, setPkt] = useState<string>('nos');
   const [productRows, setProductRows] = useState<ProductRowItem[]>([]);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editRowData, setEditRowData] = useState<{
@@ -294,11 +319,34 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   // Subtab 5: Add Credit Form State
   const [addCreditCustomerName, setAddCreditCustomerName] = useState<string>('');
   const [creditAmount, setCreditAmount] = useState<string>('');
-  const [creditNotes, setCreditNotes] = useState<string>('Additional customer advance');
+  const [creditNotes, setCreditNotes] = useState<string>('');
   const [creditDate, setCreditDate] = useState<string>(() => {
     const today = new Date();
     return today.toLocaleDateString('en-GB').replace(/\//g, '-');
   });
+  const [creditPaymentType, setCreditPaymentType] = useState<string>('Cash');
+  const [savedAccounts, setSavedAccounts] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('bussy_bee_transfer_accounts');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return ['GPK Main Current A/C', 'GPK Cash Counter', 'Axis Bank A/C', 'HDFC Bank A/C'];
+  });
+  const [creditTransferredTo, setCreditTransferredTo] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('bussy_bee_transfer_accounts');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+      }
+    } catch {}
+    return 'GPK Main Current A/C';
+  });
+  const [manageAccountsModalOpen, setManageAccountsModalOpen] = useState(false);
+  const [newAccountInput, setNewAccountInput] = useState('');
   const [creditLoading, setCreditLoading] = useState(false);
 
   // Bill Print Modal State
@@ -422,15 +470,55 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
     }
   }, [activeSubTab]);
 
-  // Load Dropdown Options
+  // Keep Company Info in sync with Settings updates
+  useEffect(() => {
+    const syncCompany = () => {
+      const savedName = localStorage.getItem('bussy_bee_company_name');
+      const savedAddr = localStorage.getItem('bussy_bee_company_address');
+      const savedGst = localStorage.getItem('bussy_bee_company_gst');
+      const savedPhone = localStorage.getItem('bussy_bee_company_phone');
+      if (savedName) setCompany(savedName);
+      if (savedAddr) setCompanyAddress(savedAddr);
+      if (savedGst) setCompanyGst(savedGst);
+      if (savedPhone !== null && savedPhone !== undefined) setCompanyPhone(savedPhone);
+    };
+
+    window.addEventListener('bussy_bee_company_updated', syncCompany);
+    return () => window.removeEventListener('bussy_bee_company_updated', syncCompany);
+  }, []);
+
+  // Load Dropdown Options & Settings
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [custRes, compRes, prodRes] = await Promise.all([
+        const [custRes, compRes, prodRes, settingsRes] = await Promise.all([
           CustomersApi.getAll(),
           CompaniesApi.getAll(),
           ProductsApi.getAll(),
+          SettingsApi.getSettings().catch(() => null),
         ]);
+
+        if (settingsRes) {
+          if (settingsRes.companyName) {
+            setCompany(settingsRes.companyName);
+            localStorage.setItem('bussy_bee_company_name', settingsRes.companyName);
+          }
+          if (settingsRes.companyAddress) {
+            setCompanyAddress(settingsRes.companyAddress);
+            localStorage.setItem('bussy_bee_company_address', settingsRes.companyAddress);
+          }
+          if (settingsRes.companyGst) {
+            setCompanyGst(settingsRes.companyGst);
+            localStorage.setItem('bussy_bee_company_gst', settingsRes.companyGst);
+          }
+          if (settingsRes.companyPhone !== undefined) {
+            setCompanyPhone(settingsRes.companyPhone);
+            localStorage.setItem('bussy_bee_company_phone', settingsRes.companyPhone);
+          }
+          if (settingsRes.companyState) {
+            localStorage.setItem('bussy_bee_company_state', settingsRes.companyState);
+          }
+        }
 
         if (custRes && custRes.length > 0) {
           const mapped = custRes.map((c: any) => ({
@@ -439,6 +527,9 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
             address: c.address,
             gst: c.gst,
             mobile: c.mobile || c.phone || '',
+            aadhar: c.aadhar || '',
+            state: c.state || 'Tamil Nadu',
+            pan: c.pan || '',
           }));
           setCustomerOptions(mapped);
 
@@ -453,41 +544,21 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
               if (existing.mobile) {
                 setCustomerPhone(existing.mobile);
               }
-              if (existing.gst) {
-                setCustomerGst(existing.gst);
+              if (existing.gst || existing.aadhar) {
+                setCustomerGst(existing.gst || existing.aadhar);
+              }
+              if (existing.state) {
+                setCustomerState(existing.state);
+              }
+              if (existing.pan) {
+                setCustomerPan(existing.pan);
               }
             }
           }
         }
 
-        if (compRes && compRes.length > 0) {
-          const mapped = compRes.map((c: any) => ({
-            id: c._id || c.id,
-            name: c.name,
-            address: c.address || '',
-            gstin: c.gstin || c.gst || '',
-            phone: c.phone || c.mobile || '',
-          }));
-
-          const savedComp = localStorage.getItem('bussy_bee_particular_company');
-          if (savedComp) {
-            const matched = mapped.find((c: any) => c.name.toLowerCase() === savedComp.toLowerCase());
-            if (matched) {
-              setCompany(matched.name);
-              setCompanyAddress(matched.address || localStorage.getItem('bussy_bee_particular_comp_addr') || '');
-              setCompanyGst(matched.gstin || localStorage.getItem('bussy_bee_particular_comp_gst') || '');
-              setCompanyPhone(matched.phone || localStorage.getItem('bussy_bee_particular_comp_phone') || '');
-            }
-          } else if (mapped.length > 0) {
-            setCompany(mapped[0].name);
-            setCompanyAddress(mapped[0].address || '');
-            setCompanyGst(mapped[0].gstin || '');
-            setCompanyPhone(mapped[0].phone || '');
-            localStorage.setItem('bussy_bee_particular_company', mapped[0].name);
-            localStorage.setItem('bussy_bee_particular_comp_addr', mapped[0].address || '');
-            localStorage.setItem('bussy_bee_particular_comp_gst', mapped[0].gstin || '');
-            localStorage.setItem('bussy_bee_particular_comp_phone', mapped[0].phone || '');
-          }
+        if (compRes && compRes.length > 0 && !settingsRes?.companyName) {
+          setCompany('Sri Shanmuga Traders');
         }
 
         if (prodRes && prodRes.length > 0) {
@@ -685,32 +756,42 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
     return productRows.reduce((acc, row) => acc + (parseFloat(row.amount) || 0), 0);
   }, [productRows]);
 
-  // Discount Calculation (Supports % like 5% or flat rupees like 500)
-  const discountVal = useMemo(() => {
-    if (!discount) return 0;
-    const cleanDisc = String(discount).trim();
-    const num = parseFloat(cleanDisc) || 0;
+  // Packing Calculation (Percentage based)
+  const packingVal = useMemo(() => {
+    if (!packing) return 0;
+    const cleanPack = String(packing).trim().replace(/[^0-9.]/g, '');
+    const num = parseFloat(cleanPack) || 0;
     if (num <= 0) return 0;
-    if (cleanDisc.endsWith('%') || num <= 100) {
-      return (subtotalAmount * num) / 100;
-    }
-    return num;
-  }, [discount, subtotalAmount]);
+    return (subtotalAmount * num) / 100;
+  }, [packing, subtotalAmount]);
 
-  // Tax Calculation (Manual fixed amount directly added)
+  // Tax Calculation (Mutually exclusive: Fixed ₹ Amount OR Dropdown %)
   const taxVal = useMemo(() => {
-    if (!tax) return 0;
-    const cleanTax = String(tax).trim().replace(/[^0-9.]/g, '');
-    const num = parseFloat(cleanTax) || 0;
-    if (num <= 0) return 0;
-    return num;
-  }, [tax]);
+    if (tax && parseFloat(tax) > 0) {
+      const cleanTax = String(tax).trim().replace(/[^0-9.]/g, '');
+      return parseFloat(cleanTax) || 0;
+    }
+    if (taxPercent && parseFloat(taxPercent) > 0) {
+      const pct = parseFloat(taxPercent) || 0;
+      return ((subtotalAmount + packingVal) * pct) / 100;
+    }
+    return 0;
+  }, [tax, taxPercent, subtotalAmount, packingVal]);
 
-  // Final Net Total Amount (Packing & Transport removed)
+  // Raw Net Total before Round Off
+  const rawTotalAmount = useMemo(() => {
+    return Math.max(0, subtotalAmount + packingVal + taxVal);
+  }, [subtotalAmount, packingVal, taxVal]);
+
+  // Round Off Difference: (.5 & above rounds up (+1), below .5 rounds down)
+  const roundOffDiff = useMemo(() => {
+    return Math.round(rawTotalAmount) - rawTotalAmount;
+  }, [rawTotalAmount]);
+
+  // Final Rounded Grand Total Amount
   const finalTotalAmount = useMemo(() => {
-    const net = Math.max(0, subtotalAmount - discountVal + taxVal);
-    return net.toFixed(2);
-  }, [subtotalAmount, discountVal, taxVal]);
+    return Math.round(rawTotalAmount).toFixed(2);
+  }, [rawTotalAmount]);
 
   // Subtab 2: Submit Particular Bill
   const handleCreateParticular = async () => {
@@ -780,19 +861,25 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         customerAddress: resolvedAddress,
         customerPhone: customerPhone.trim(),
         customerGst: customerGst.trim() || targetCustomer?.gst || '',
-        caseCount: caseCount || '0',
-        companyName: company.trim() || 'BUSSY BEE',
+        customerState: customerState.trim() || targetCustomer?.state || 'Tamil Nadu',
+        customerAadhar: customerGst.trim() || targetCustomer?.aadhar || '',
+        customerPan: customerPan.trim() || targetCustomer?.pan || '',
+        bundles: bundlesQty || '0',
+        caseCount: bundlesQty || caseCount || '0',
+        companyName: company.trim() || 'Sri Shanmuga Traders',
         companyAddress: companyAddress.trim(),
         companyGst: companyGst.trim(),
         companyPhone: companyPhone.trim(),
-        traderName: company.trim() || 'BUSSY BEE',
+        traderName: company.trim() || 'Sri Shanmuga Traders',
         traderAddress: companyAddress.trim(),
         traderGst: companyGst.trim(),
-        discount: discount || '0',
+        traderPhone: companyPhone.trim(),
+        discount: '0',
         transport: transportName.trim() || '-',
-        packing: '0',
+        lrNo: lrNo.trim() || '-',
+        packing: packing ? `${packing}%` : '0',
         billNo: billNo.trim(),
-        tax: tax || '0',
+        tax: String(taxVal.toFixed(2)),
         amount: subtotalAmount.toFixed(2),
         total: finalTotalAmount,
         date: date,
@@ -813,15 +900,15 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         billNo: assignedBillNo,
         customerName: currentCustomerName || 'General',
         customerAddress: resolvedAddress,
-        customerState: customerState.trim() || 'Tamil Nadu',
+        customerState: customerState.trim() || targetCustomer?.state || 'Tamil Nadu',
         customerGst: customerGst.trim() || targetCustomer?.gst || '',
         customerMobile: customerPhone.trim() || targetCustomer?.mobile || '+91 98765 43210',
         customerPhone: customerPhone.trim() || targetCustomer?.mobile || '',
-        companyName: company.trim() || 'BUSSY BEE',
+        companyName: company.trim() || 'Sri Shanmuga Traders',
         companyAddress: companyAddress.trim(),
         companyGst: companyGst.trim(),
         companyPhone: companyPhone.trim(),
-        traderName: company.trim() || 'BUSSY BEE',
+        traderName: company.trim() || 'Sri Shanmuga Traders',
         traderAddress: companyAddress.trim(),
         traderGst: companyGst.trim(),
         traderPhone: companyPhone.trim(),
@@ -830,7 +917,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         email: 'info@bussybee.com',
         website: 'www.bussybee.com',
         transport: transportName.trim() || '-',
-        caseCount: caseCount || '0',
+        lrNo: lrNo.trim() || '-',
+        caseCount: bundlesQty || caseCount || '0',
         date: date,
         products: productRows.map((p) => ({
           particular: p.particular,
@@ -841,9 +929,9 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
           amount: p.amount,
         })),
         amount: subtotalAmount.toFixed(2),
-        discount: discount || '0',
-        packing: '0',
-        tax: tax || '0',
+        discount: '0',
+        packing: packing ? `${packing}%` : '0',
+        tax: String(taxVal.toFixed(2)),
         total: finalTotalAmount,
       };
 
@@ -855,10 +943,14 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
       setHsnCode('');
       setProductRows([]);
       setCaseCount('0');
-      setDiscount('');
+      setBundlesQty('0');
+      setPacking('');
       setTax('');
+      setTaxPercent('');
       setTransportName('');
+      setLrNo('');
       localStorage.removeItem('bussy_bee_particular_transport');
+      localStorage.removeItem('bussy_bee_particular_lr_no');
       fetchAccounts(accountFilterCustomer);
       fetchParticulars('ALL');
       setParticularFilterCustomer('ALL');
@@ -876,6 +968,35 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
     }
   };
 
+  // Account Names Management for Subtab 5 (Add Credit)
+  const handleAddSavedAccount = () => {
+    const trimmed = newAccountInput.trim();
+    if (!trimmed) return;
+    if (savedAccounts.some((a) => a.toLowerCase() === trimmed.toLowerCase())) {
+      alert('This account name already exists');
+      return;
+    }
+    const updated = [...savedAccounts, trimmed];
+    setSavedAccounts(updated);
+    try {
+      localStorage.setItem('bussy_bee_transfer_accounts', JSON.stringify(updated));
+    } catch {}
+    setNewAccountInput('');
+    setCreditTransferredTo(trimmed);
+  };
+
+  const handleDeleteSavedAccount = (nameToDelete: string) => {
+    if (!window.confirm(`Delete "${nameToDelete}" from saved account names?`)) return;
+    const updated = savedAccounts.filter((a) => a !== nameToDelete);
+    setSavedAccounts(updated);
+    try {
+      localStorage.setItem('bussy_bee_transfer_accounts', JSON.stringify(updated));
+    } catch {}
+    if (creditTransferredTo === nameToDelete) {
+      setCreditTransferredTo(updated.length > 0 ? updated[0] : '');
+    }
+  };
+
   // Subtab 5: Submit Credit
   const handleAddCreditSubmit = async () => {
     const targetCust = addCreditCustomerName || currentCustomerName || (customerOptions[0]?.name ?? 'General');
@@ -888,17 +1009,19 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
       setCreditLoading(true);
       const res = await AccountsApi.addCredit({
         customerName: targetCust,
-        companyName: '',
+        companyName: creditTransferredTo || '',
         creditAmount: creditAmount.trim(),
         date: creditDate,
-        paymentMode: 'Bank',
+        paymentMode: creditPaymentType,
+        paymentType: creditPaymentType,
+        transferredTo: creditTransferredTo,
         reference: '',
-        notes: creditNotes.trim(),
+        notes: creditNotes ? creditNotes.trim() : `${creditPaymentType} received into ${creditTransferredTo || 'Account'}`,
       });
 
       alert(res?.message || 'Credit added successfully!');
       setCreditAmount('');
-      setCreditNotes('Additional customer payment');
+      setCreditNotes('');
       
       // Refresh all financial states
       fetchAccounts(accountFilterCustomer);
@@ -964,10 +1087,19 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
     const targetCustomer = customerOptions.find(
       (c) => c.name.toLowerCase() === (billData.customerName || currentCustomerName || '').toLowerCase()
     );
-    const compName = 'BUSSY BEE';
-    const compAddr = billData.traderAddress || billData.companyAddress || '';
-    const compGst = billData.traderGst || billData.companyGst || '';
-    const compPhone = billData.traderPhone || billData.companyPhone || '';
+    const savedName = localStorage.getItem('bussy_bee_company_name');
+    const savedAddr = localStorage.getItem('bussy_bee_company_address');
+    const savedGst = localStorage.getItem('bussy_bee_company_gst');
+    const savedPhone = localStorage.getItem('bussy_bee_company_phone');
+
+    const compName = billData.traderName && billData.traderName !== 'BUSSY BEE'
+      ? billData.traderName
+      : (billData.companyName && billData.companyName !== 'BUSSY BEE'
+        ? billData.companyName
+        : (savedName || company || 'Sri Shanmuga Traders'));
+    const compAddr = billData.traderAddress || billData.companyAddress || savedAddr || companyAddress || '352, Amman Kovil Patti Middle Street, Sivakasi - 626123';
+    const compGst = billData.traderGst || billData.companyGst || savedGst || companyGst || '33BUMPR9147N1ZQ';
+    const compPhone = billData.traderPhone || billData.companyPhone || savedPhone || companyPhone || '';
 
     const formattedBill: BillPrintData = {
       id: billData._id || billData.id || '',
@@ -992,6 +1124,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
       email: 'info@bussybee.com',
       website: 'www.bussybee.com',
       transport: billData.transport && billData.transport.trim() !== '' && billData.transport !== '-' ? billData.transport.trim() : '-',
+      lrNo: billData.lrNo && billData.lrNo.trim() !== '' && billData.lrNo !== '-' ? billData.lrNo.trim() : '-',
       caseCount: billData.caseCount || billData.cases || (billData.products ? billData.products.reduce((acc: number, p: any) => acc + (parseFloat(p.quantity) || 0), 0) : 0),
       products: (billData.products || []).map((p: any) => ({
         particular: p.particular || p.particularName || p.name || '',
@@ -1028,16 +1161,38 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   const handleShareBillWhatsApp = async (billData: any) => {
     try {
       const targetCustomer = customerOptions.find(
-        (c) => c.name.toLowerCase() === (billData.customerName || currentCustomerName || '').toLowerCase()
+        (c) =>
+          (c.name && billData.customerName && c.name.trim().toLowerCase() === billData.customerName.trim().toLowerCase()) ||
+          (c.id && billData.customerId && String(c.id) === String(billData.customerId))
       );
-      const custPhone = billData.customerMobile || billData.customerPhone || targetCustomer?.mobile || '';
+      let custPhone = billData.customerMobile || billData.customerPhone || targetCustomer?.mobile || '';
+      if (!custPhone && billData.customerName) {
+        try {
+          const freshCusts = await CustomersApi.getAll();
+          const found = (freshCusts || []).find(
+            (c: any) => c.name && c.name.trim().toLowerCase() === billData.customerName.trim().toLowerCase()
+          );
+          if (found) {
+            custPhone = found.mobile || found.phone || '';
+          }
+        } catch {}
+      }
       const custAddress = targetCustomer?.address || billData.customerAddress || '';
       const custGst = targetCustomer?.gst || billData.customerGst || '';
 
-      const compName = 'BUSSY BEE';
-      const compAddr = billData.traderAddress || billData.companyAddress || '';
-      const compGst = billData.traderGst || billData.companyGst || '';
-      const compPhone = billData.traderPhone || billData.companyPhone || '';
+      const savedName = localStorage.getItem('bussy_bee_company_name');
+      const savedAddr = localStorage.getItem('bussy_bee_company_address');
+      const savedGst = localStorage.getItem('bussy_bee_company_gst');
+      const savedPhone = localStorage.getItem('bussy_bee_company_phone');
+
+      const compName = billData.traderName && billData.traderName !== 'BUSSY BEE'
+        ? billData.traderName
+        : (billData.companyName && billData.companyName !== 'BUSSY BEE'
+          ? billData.companyName
+          : (savedName || company || 'Sri Shanmuga Traders'));
+      const compAddr = billData.traderAddress || billData.companyAddress || savedAddr || companyAddress || '352, Amman Kovil Patti Middle Street, Sivakasi - 626123';
+      const compGst = billData.traderGst || billData.companyGst || savedGst || companyGst || '33BUMPR9147N1ZQ';
+      const compPhone = billData.traderPhone || billData.companyPhone || savedPhone || companyPhone || '';
 
       const formattedBill: BillPrintData = {
         id: billData._id || billData.id || '',
@@ -1062,6 +1217,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         email: 'info@bussybee.com',
         website: 'www.bussybee.com',
         transport: billData.transport && billData.transport !== '-' ? billData.transport : '-',
+        lrNo: billData.lrNo && billData.lrNo !== '-' ? billData.lrNo : '-',
         caseCount: billData.caseCount || billData.cases || (billData.products ? billData.products.reduce((acc: number, p: any) => acc + (parseFloat(p.quantity) || 0), 0) : 0),
         date: billData.date || new Date().toISOString().split('T')[0],
         products: (billData.products || []).map((p: any) => ({
@@ -1107,6 +1263,10 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   const handleOpenEditParticular = (row: any) => {
     const rowId = row._id || row.id || '';
     setEditingParticularId(rowId);
+    const rawPack = row.packing !== undefined && row.packing !== null && String(row.packing).trim() !== ''
+      ? String(row.packing).replace(/[^0-9.]/g, '')
+      : (row.discount !== undefined && row.discount !== null ? String(row.discount).replace(/[^0-9.]/g, '') : '');
+
     setEditBillForm({
       billNo: row.billNo || '',
       date: row.date || '',
@@ -1114,15 +1274,15 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
       companyName: row.companyName || '',
       transport: row.transport && row.transport !== '-' ? row.transport : '',
       caseCount: String(row.caseCount || '0'),
-      discount: String(row.discount || '0'),
-      packing: String(row.packing || '0'),
+      discount: '0',
+      packing: rawPack === '0' ? '' : rawPack,
       tax: String(row.tax || '0'),
       products: (row.products || []).map((p: any, idx: number) => ({
         id: p._id || p.id || `edit-prod-${idx}`,
         particular: p.particular || p.particularName || p.name || '',
         quantity: String(p.quantity || '0'),
         rate: String(p.rate || '0'),
-        pktUnit: p.pktUnit || p.pkt || '-',
+        pktUnit: p.pktUnit && p.pktUnit !== '-' ? p.pktUnit : (p.pkt && p.pkt !== '-' ? p.pkt : 'nos'),
         amount: String(p.amount || '0'),
       })),
     });
@@ -1135,10 +1295,10 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         ...prev.products,
         {
           id: `edit-prod-${Date.now()}`,
-          particular: productOptions[0]?.name || '',
-          quantity: '1',
-          rate: '0',
-          pktUnit: '-',
+          particular: '',
+          quantity: '',
+          rate: '',
+          pktUnit: 'nos',
           amount: '0.00',
         },
       ];
@@ -1177,14 +1337,14 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
     return editBillForm.products.reduce((acc, p) => acc + (parseFloat(p.amount) || 0), 0);
   }, [editBillForm.products]);
 
-  const editDiscountVal = useMemo(() => {
-    const dStr = String(editBillForm.discount || '').trim();
-    if (!dStr) return 0;
-    const cleanDisc = dStr.replace(/[^0-9.]/g, '');
-    const dNum = parseFloat(cleanDisc) || 0;
-    if (dNum <= 0) return 0;
-    return dStr.includes('%') || dNum <= 100 ? (editSubtotal * dNum) / 100 : dNum;
-  }, [editSubtotal, editBillForm.discount]);
+  const editPackingVal = useMemo(() => {
+    const pStr = String(editBillForm.packing || '').trim();
+    if (!pStr) return 0;
+    const cleanPack = pStr.replace(/[^0-9.]/g, '');
+    const pNum = parseFloat(cleanPack) || 0;
+    if (pNum <= 0) return 0;
+    return (editSubtotal * pNum) / 100;
+  }, [editSubtotal, editBillForm.packing]);
 
   const editTaxVal = useMemo(() => {
     const tStr = String(editBillForm.tax || '').trim();
@@ -1196,9 +1356,10 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
   }, [editBillForm.tax]);
 
   const editFinalTotal = useMemo(() => {
-    const net = Math.max(0, editSubtotal - editDiscountVal + editTaxVal);
-    return net.toFixed(2);
-  }, [editSubtotal, editDiscountVal, editTaxVal]);
+    const net = Math.max(0, editSubtotal + editPackingVal + editTaxVal);
+    const rounded = Math.round(net);
+    return rounded.toFixed(2);
+  }, [editSubtotal, editPackingVal, editTaxVal]);
 
   const handleSaveEditParticular = async () => {
     if (!editingParticularId) return;
@@ -1210,8 +1371,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
         date: editBillForm.date,
         transport: '-',
         caseCount: editBillForm.caseCount || '0',
-        discount: editBillForm.discount || '0',
-        packing: '0',
+        discount: '0',
+        packing: editBillForm.packing ? `${editBillForm.packing}%` : '0',
         tax: editBillForm.tax || '0',
         billNo: editBillForm.billNo,
         amount: editSubtotal.toFixed(2),
@@ -1656,12 +1817,26 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   gridTemplateColumns: {
                     xs: '1fr',
                     sm: 'repeat(2, 1fr)',
-                    md: '1fr 1.3fr 1.1fr 1.4fr',
+                    md: 'repeat(5, 1fr)',
                   },
                   gap: 2,
                 }}
               >
-                {/* 1. Bill No * */}
+                {/* 1. Date */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    Date <span style={{ color: '#DC2626' }}>*</span>
+                  </Typography>
+                  <DatePickerField
+                    value={date}
+                    onChange={setDate}
+                    placeholder="dd-mm-yyyy"
+                    iconSize={16}
+                    inputSx={{ height: '36px' }}
+                  />
+                </Box>
+
+                {/* 2. Bill No * */}
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
                     Bill No <span style={{ color: '#DC2626' }}>*</span>
@@ -1689,7 +1864,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   />
                 </Box>
 
-                {/* 2. Customer Name * */}
+                {/* 3. Customer Name * */}
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
                     Customer Name <span style={{ color: '#DC2626' }}>*</span>
@@ -1711,18 +1886,26 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                         setAddCreditCustomerName(val.name);
                         setCustomerAddress(val.address || '');
                         setCustomerPhone(val.mobile || '');
-                        setCustomerGst(val.gst || '');
+                        setCustomerGst(val.gst || val.aadhar || val.pan || '');
+                        setCustomerState(val.state || 'Tamil Nadu');
+                        setCustomerPan(val.pan || '');
                         if (val.address) localStorage.setItem('bussy_bee_particular_cust_addr', val.address);
                         if (val.mobile) localStorage.setItem('bussy_bee_particular_cust_phone', val.mobile);
-                        if (val.gst) localStorage.setItem('bussy_bee_particular_cust_gst', val.gst);
+                        if (val.gst || val.aadhar || val.pan) localStorage.setItem('bussy_bee_particular_cust_gst', val.gst || val.aadhar || val.pan || '');
+                        if (val.state) localStorage.setItem('bussy_bee_particular_cust_state', val.state);
+                        if (val.pan) localStorage.setItem('bussy_bee_particular_cust_pan', val.pan);
                       } else {
                         setSelectedCustomerId('');
                         setCustomerAddress('');
                         setCustomerPhone('');
                         setCustomerGst('');
+                        setCustomerState('Tamil Nadu');
+                        setCustomerPan('');
                         localStorage.removeItem('bussy_bee_particular_cust_addr');
                         localStorage.removeItem('bussy_bee_particular_cust_phone');
                         localStorage.removeItem('bussy_bee_particular_cust_gst');
+                        localStorage.removeItem('bussy_bee_particular_cust_state');
+                        localStorage.removeItem('bussy_bee_particular_cust_pan');
                       }
                     }}
                     renderInput={(params) => (
@@ -1748,7 +1931,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   />
                 </Box>
 
-                {/* 3. Mobile Number * */}
+                {/* 4. Mobile Number * */}
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
                     Mobile Number <span style={{ color: '#DC2626' }}>*</span>
@@ -1780,7 +1963,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   />
                 </Box>
 
-                {/* 4. Address */}
+                {/* 5. Address */}
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
                     Address
@@ -1811,19 +1994,69 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   />
                 </Box>
 
-                {/* 5. State */}
+                {/* 6. State (Searchable Autocomplete Text Box) */}
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    State
+                    State <span style={{ color: '#DC2626' }}>*</span>
+                  </Typography>
+                  <Autocomplete
+                    fullWidth
+                    size="small"
+                    autoHighlight
+                    openOnFocus
+                    options={INDIAN_STATES}
+                    value={customerState || null}
+                    onChange={(_event, newValue) => {
+                      const val = newValue || '';
+                      setCustomerState(val);
+                      localStorage.setItem('bussy_bee_particular_cust_state', val);
+                    }}
+                    onInputChange={(_event, newInputValue, reason) => {
+                      if (reason === 'input' || reason === 'clear') {
+                        setCustomerState(newInputValue || '');
+                        localStorage.setItem('bussy_bee_particular_cust_state', newInputValue || '');
+                      }
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        placeholder="Select or search state..."
+                        sx={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '6px',
+                          '& .MuiOutlinedInput-root': {
+                            height: '36px',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            color: '#0F172A',
+                            '& fieldset': { borderColor: '#CBD5E1' },
+                            '&:hover fieldset': { borderColor: '#94A3B8' },
+                            '&.Mui-focused fieldset': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
+                            '& input::placeholder': {
+                              color: '#94A3B8',
+                              opacity: 1,
+                            },
+                          },
+                        }}
+                      />
+                    )}
+                  />
+                </Box>
+
+                {/* 7. GST Number / Aadhar no / PAN */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    GST Number / Aadhar no / PAN
                   </Typography>
                   <TextField
                     fullWidth
                     size="small"
-                    placeholder="State (e.g. Tamil Nadu)"
-                    value={customerState}
+                    placeholder="GSTIN / Aadhar / PAN"
+                    value={customerGst}
                     onChange={(e) => {
-                      setCustomerState(e.target.value);
-                      localStorage.setItem('bussy_bee_particular_cust_state', e.target.value);
+                      setCustomerGst(e.target.value);
+                      localStorage.setItem('bussy_bee_particular_cust_gst', e.target.value);
                     }}
                     slotProps={{
                       input: {
@@ -1842,7 +2075,38 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   />
                 </Box>
 
-                {/* 6. Transport Name */}
+                {/* 8. LR Number */}
+                <Box>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                    LR Number
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Enter LR Number"
+                    value={lrNo}
+                    onChange={(e) => {
+                      setLrNo(e.target.value);
+                      localStorage.setItem('bussy_bee_particular_lr_no', e.target.value);
+                    }}
+                    slotProps={{
+                      input: {
+                        sx: {
+                          fontSize: '13px',
+                          fontWeight: 500,
+                          height: '36px',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '6px',
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+
+                {/* 9. Transport Name */}
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
                     Transport Name
@@ -1873,25 +2137,25 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   />
                 </Box>
 
-                {/* 7. GST Number / PAN / AADHAR no */}
+                {/* 10. Bundles Qty (bundel) */}
                 <Box>
                   <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    GST Number / PAN / AADHAR no
+                    Bundles Qty (bundel)
                   </Typography>
                   <TextField
                     fullWidth
                     size="small"
-                    placeholder="GSTIN / PAN / AADHAR (Optional)"
-                    value={customerGst}
+                    placeholder="Bundles Qty"
+                    value={bundlesQty}
                     onChange={(e) => {
-                      setCustomerGst(e.target.value);
-                      localStorage.setItem('bussy_bee_particular_cust_gst', e.target.value);
+                      setBundlesQty(e.target.value);
+                      setCaseCount(e.target.value);
                     }}
                     slotProps={{
                       input: {
                         sx: {
                           fontSize: '13px',
-                          fontWeight: 500,
+                          fontWeight: 600,
                           height: '36px',
                           backgroundColor: '#FFFFFF',
                           borderRadius: '6px',
@@ -1901,20 +2165,6 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                         },
                       },
                     }}
-                  />
-                </Box>
-
-                {/* 8. Date */}
-                <Box>
-                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                    Date
-                  </Typography>
-                  <DatePickerField
-                    value={date}
-                    onChange={setDate}
-                    placeholder="dd-mm-yyyy"
-                    iconSize={16}
-                    inputSx={{ height: '36px' }}
                   />
                 </Box>
               </Box>
@@ -2078,22 +2328,30 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
               )}
 
               <TextField
+                select
                 size="small"
-                placeholder="Pkt / Units"
-                value={pkt}
+                value={pkt || 'nos'}
                 onChange={(e) => setPkt(e.target.value)}
                 sx={{
-                  flex: { xs: '1 1 45%', sm: 0.9 },
-                  minWidth: '75px',
+                  flex: { xs: '1 1 45%', sm: 1.1 },
+                  minWidth: '95px',
                   '& .MuiOutlinedInput-root': {
                     height: '36px',
                     fontSize: '13px',
-                    fontWeight: 500,
+                    fontWeight: 600,
                     borderRadius: '6px',
                     '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
                   },
                 }}
-              />
+              >
+                {PKT_UNIT_OPTIONS.map((unit) => (
+                  <MenuItem key={unit} value={unit} sx={{ fontSize: '13px', fontWeight: 600 }}>
+                    {unit}
+                  </MenuItem>
+                ))}
+              </TextField>
 
               <TextField
                 size="small"
@@ -2481,33 +2739,29 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                           >
                             {isEditing ? (
                               <TextField
+                                select
                                 size="small"
-                                placeholder="1"
-                                value={editRowData.pktUnit}
+                                value={editRowData.pktUnit || 'nos'}
                                 onChange={(e) =>
                                   setEditRowData((prev) => ({ ...prev, pktUnit: e.target.value }))
                                 }
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSaveEditRow(row.id);
-                                  } else if (e.key === 'Escape') {
-                                    handleCancelEditRow();
-                                  }
-                                }}
-                                slotProps={{
-                                  input: {
-                                    sx: {
-                                      fontSize: '13px',
-                                      fontWeight: 700,
-                                      textAlign: 'center',
-                                      backgroundColor: '#FFFFFF',
-                                      '& input': { textAlign: 'center', py: 0.5, px: 0.5 },
-                                    },
+                                sx={{
+                                  width: '95px',
+                                  '& .MuiOutlinedInput-root': {
+                                    height: '32px',
+                                    fontSize: '12.5px',
+                                    fontWeight: 700,
+                                    backgroundColor: '#FFFFFF',
+                                    borderRadius: '6px',
                                   },
                                 }}
-                                sx={{ width: '70px' }}
-                              />
+                              >
+                                {PKT_UNIT_OPTIONS.map((unit) => (
+                                  <MenuItem key={unit} value={unit} sx={{ fontSize: '12.5px' }}>
+                                    {unit}
+                                  </MenuItem>
+                                ))}
+                              </TextField>
                             ) : (
                               row.pktUnit
                             )}
@@ -2659,17 +2913,17 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
 
                 <Divider sx={{ my: 0.2 }} />
 
-                {/* 2. Discount Box and Tax Box (Stacked Vertically) */}
+                {/* 2. Packing Box and Tax Boxes (Stacked Vertically) */}
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {/* Discount Box */}
+                  {/* Packing (%) Box */}
                   <Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.4 }}>
                       <Typography sx={{ fontSize: '11.5px', fontWeight: 600, color: '#475569' }}>
-                        Discount (%)
+                        Packing (%)
                       </Typography>
-                      {discountVal > 0 && (
-                        <Typography sx={{ fontSize: '10.5px', fontWeight: 700, color: '#DC2626' }}>
-                          -₹{discountVal.toFixed(2)}
+                      {packingVal > 0 && (
+                        <Typography sx={{ fontSize: '10.5px', fontWeight: 700, color: '#16A34A' }}>
+                          +₹{packingVal.toFixed(2)}
                         </Typography>
                       )}
                     </Box>
@@ -2677,8 +2931,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                       fullWidth
                       size="small"
                       placeholder="0"
-                      value={discount}
-                      onChange={(e) => setDiscount(e.target.value)}
+                      value={packing}
+                      onChange={(e) => setPacking(e.target.value)}
                       slotProps={{
                         input: {
                           sx: {
@@ -2696,13 +2950,13 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     />
                   </Box>
 
-                  {/* Tax Box */}
+                  {/* Tax (₹) Box */}
                   <Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.4 }}>
                       <Typography sx={{ fontSize: '11.5px', fontWeight: 600, color: '#475569' }}>
-                        Tax (₹)
+                        Tax (₹) {Boolean(taxPercent && parseFloat(taxPercent) > 0) && <span style={{ color: '#94A3B8' }}>(Disabled - % Selected)</span>}
                       </Typography>
-                      {taxVal > 0 && (
+                      {tax && parseFloat(tax) > 0 && (
                         <Typography sx={{ fontSize: '10.5px', fontWeight: 700, color: '#16A34A' }}>
                           +₹{taxVal.toFixed(2)}
                         </Typography>
@@ -2711,16 +2965,20 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     <TextField
                       fullWidth
                       size="small"
-                      placeholder="Enter Tax"
+                      placeholder="Enter Tax (₹)"
                       value={tax}
-                      onChange={(e) => setTax(e.target.value)}
+                      disabled={Boolean(taxPercent && parseFloat(taxPercent) > 0)}
+                      onChange={(e) => {
+                        setTax(e.target.value);
+                        if (e.target.value) setTaxPercent('');
+                      }}
                       slotProps={{
                         input: {
                           sx: {
                             fontSize: '13px',
                             fontWeight: 600,
                             height: '36px',
-                            backgroundColor: '#FFFFFF',
+                            backgroundColor: Boolean(taxPercent && parseFloat(taxPercent) > 0) ? '#F1F5F9' : '#FFFFFF',
                             borderRadius: '6px',
                             '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
                             '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
@@ -2730,7 +2988,64 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                       }}
                     />
                   </Box>
+
+                  {/* Tax (%) Dropdown Box */}
+                  <Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.4 }}>
+                      <Typography sx={{ fontSize: '11.5px', fontWeight: 600, color: '#475569' }}>
+                        Tax (%) {Boolean(tax && parseFloat(tax) > 0) && <span style={{ color: '#94A3B8' }}>(Disabled - ₹ Entered)</span>}
+                      </Typography>
+                      {taxPercent && parseFloat(taxPercent) > 0 && (
+                        <Typography sx={{ fontSize: '10.5px', fontWeight: 700, color: '#16A34A' }}>
+                          +₹{taxVal.toFixed(2)}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Select
+                      fullWidth
+                      size="small"
+                      value={taxPercent}
+                      disabled={Boolean(tax && parseFloat(tax) > 0)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setTaxPercent(val);
+                        if (val && parseFloat(val) > 0) setTax('');
+                      }}
+                      displayEmpty
+                      sx={{
+                        height: '36px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        backgroundColor: Boolean(tax && parseFloat(tax) > 0) ? '#F1F5F9' : '#FFFFFF',
+                        borderRadius: '6px',
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: '#CBD5E1' },
+                        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94A3B8' },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0B4DB7', borderWidth: '1.5px' },
+                      }}
+                    >
+                      <MenuItem value="" sx={{ fontSize: '13px' }}>
+                        <em>None (0%)</em>
+                      </MenuItem>
+                      {TAX_PERCENT_OPTIONS.filter((o) => Boolean(o.value)).map((opt) => (
+                        <MenuItem key={opt.value} value={String(opt.value)} sx={{ fontSize: '13px', fontWeight: 600 }}>
+                          {opt.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </Box>
                 </Box>
+
+                {/* Round Off Row */}
+                {Math.abs(roundOffDiff) > 0.001 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 0.2 }}>
+                    <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
+                      Round Off
+                    </Typography>
+                    <Typography sx={{ fontSize: '12.5px', fontWeight: 700, color: roundOffDiff >= 0 ? '#16A34A' : '#DC2626' }}>
+                      {roundOffDiff >= 0 ? `+₹${roundOffDiff.toFixed(2)}` : `-₹${Math.abs(roundOffDiff).toFixed(2)}`}
+                    </Typography>
+                  </Box>
+                )}
 
                 <Divider sx={{ my: 0.2 }} />
 
@@ -3480,7 +3795,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     SUBTOTAL
                   </TableCell>
                   <TableCell align="center" sx={{ py: 1.4, px: 1, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', width: '80px' }}>
-                    DISCOUNT
+                    PACKING
                   </TableCell>
                   <TableCell align="center" sx={{ py: 1.4, px: 1, fontSize: '11.5px', fontWeight: 700, color: '#1E293B', letterSpacing: '0.04em', borderBottom: '1px solid #E2E8F0', borderRight: '1px solid #E2E8F0', width: '75px' }}>
                     TAX
@@ -3512,7 +3827,10 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     const rowId = row._id || row.id || '';
                     const subtotalNum = parseFloat(String(row.amount || row.total || '0').replace(/,/g, '')) || 0;
                     const totalNum = parseFloat(String(row.total || row.amount || '0').replace(/,/g, '')) || 0;
-                    const discStr = row.discount && parseFloat(row.discount) > 0 ? (parseFloat(row.discount) <= 100 ? `${row.discount}%` : `₹${row.discount}`) : '-';
+                    const rawPack = row.packing !== undefined && row.packing !== null && String(row.packing).trim() !== ''
+                      ? String(row.packing).replace(/[^0-9.]/g, '')
+                      : (row.discount !== undefined && row.discount !== null ? String(row.discount).replace(/[^0-9.]/g, '') : '');
+                    const packStr = rawPack && parseFloat(rawPack) > 0 ? `${rawPack}%` : '-';
                     const taxStr = row.tax && parseFloat(row.tax) > 0 ? `₹${parseFloat(row.tax).toLocaleString('en-IN')}` : '-';
 
                     return (
@@ -3550,8 +3868,8 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                         <TableCell align="right" sx={{ py: 1.4, px: 1.5, fontSize: '13px', fontWeight: 600, color: '#475569', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6' }}>
                           ₹{subtotalNum.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </TableCell>
-                        <TableCell align="center" sx={{ py: 1.4, px: 1, fontSize: '12.5px', fontWeight: 600, color: discStr !== '-' ? '#DC2626' : '#94A3B8', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6' }}>
-                          {discStr}
+                        <TableCell align="center" sx={{ py: 1.4, px: 1, fontSize: '12.5px', fontWeight: 600, color: packStr !== '-' ? '#0284C7' : '#94A3B8', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6' }}>
+                          {packStr}
                         </TableCell>
                         <TableCell align="center" sx={{ py: 1.4, px: 1, fontSize: '12.5px', fontWeight: 600, color: taxStr !== '-' ? '#0F172A' : '#94A3B8', borderBottom: isLast ? 'none' : '1px solid #EEF2F6', borderRight: '1px solid #EEF2F6' }}>
                           {taxStr}
@@ -3704,7 +4022,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   letterSpacing: '-0.01em',
                 }}
               >
-                Add Credit - {currentCustomerName || 'Customer'}
+                Add Credit - Customer
               </Typography>
             </Box>
 
@@ -3717,7 +4035,39 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 gap: 3,
               }}
             >
-              {/* Customer Name */}
+              {/* 1. Date */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  alignItems: { xs: 'flex-start', sm: 'center' },
+                  gap: { xs: 1, sm: 3.5 },
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#0F172A',
+                    minWidth: '150px',
+                    textAlign: { sm: 'right' },
+                  }}
+                >
+                  Date
+                </Typography>
+                <DatePickerField
+                  value={creditDate}
+                  onChange={setCreditDate}
+                  placeholder="dd-mm-yyyy"
+                  iconSize={18}
+                  inputSx={{
+                    fontSize: '13.5px',
+                    height: '42px',
+                  }}
+                />
+              </Box>
+
+              {/* 2. Customer Name */}
               <Box
                 sx={{
                   display: 'flex',
@@ -3776,7 +4126,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 />
               </Box>
 
-              {/* Credit Amount */}
+              {/* 3. Credit Amount */}
               <Box
                 sx={{
                   display: 'flex',
@@ -3817,14 +4167,17 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                         '&:hover .MuiOutlinedInput-notchedOutline': {
                           borderColor: '#94A3B8',
                         },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#0B4DB7',
+                          borderWidth: '1.5px',
+                        },
                       },
                     },
                   }}
                 />
               </Box>
 
-
-              {/* Date */}
+              {/* 4. Payment Type */}
               <Box
                 sx={{
                   display: 'flex',
@@ -3842,21 +4195,127 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     textAlign: { sm: 'right' },
                   }}
                 >
-                  Date
+                  Payment Type
                 </Typography>
-                <DatePickerField
-                  value={creditDate}
-                  onChange={setCreditDate}
-                  placeholder="dd-mm-yyyy"
-                  iconSize={18}
-                  inputSx={{
-                    fontSize: '13.5px',
+                <Select
+                  fullWidth
+                  size="small"
+                  value={creditPaymentType}
+                  onChange={(e) => setCreditPaymentType(e.target.value)}
+                  sx={{
                     height: '42px',
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '6px',
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    color: '#0F172A',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#CBD5E1',
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#94A3B8',
+                    },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                      borderColor: '#0B4DB7',
+                      borderWidth: '1.5px',
+                    },
                   }}
-                />
+                >
+                  {['Cash', 'Bank Transfer', 'GPay / PhonePe / UPI', 'Cheque', 'NEFT / RTGS'].map((pt) => (
+                    <MenuItem key={pt} value={pt} sx={{ fontSize: '13.5px', fontWeight: 600 }}>
+                      {pt}
+                    </MenuItem>
+                  ))}
+                </Select>
               </Box>
 
-              {/* Notes */}
+              {/* 5. Transferred To + [+ Manage / Add] Button */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  alignItems: { xs: 'flex-start', sm: 'center' },
+                  gap: { xs: 1, sm: 3.5 },
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#0F172A',
+                    minWidth: '150px',
+                    textAlign: { sm: 'right' },
+                  }}
+                >
+                  Transferred To
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+                  <Select
+                    fullWidth
+                    size="small"
+                    value={creditTransferredTo}
+                    onChange={(e) => setCreditTransferredTo(e.target.value)}
+                    displayEmpty
+                    sx={{
+                      height: '42px',
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '6px',
+                      fontSize: '13.5px',
+                      fontWeight: 600,
+                      color: creditTransferredTo ? '#0F172A' : '#94A3B8',
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#CBD5E1',
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#94A3B8',
+                      },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                        borderColor: '#0B4DB7',
+                        borderWidth: '1.5px',
+                      },
+                    }}
+                  >
+                    {savedAccounts.length === 0 ? (
+                      <MenuItem value="" disabled sx={{ fontSize: '13.5px' }}>
+                        <em>No Accounts Saved - Click Manage to Add</em>
+                      </MenuItem>
+                    ) : (
+                      savedAccounts.map((acc) => (
+                        <MenuItem key={acc} value={acc} sx={{ fontSize: '13.5px', fontWeight: 600 }}>
+                          {acc}
+                        </MenuItem>
+                      ))
+                    )}
+                  </Select>
+
+                  <Button
+                    variant="contained"
+                    disableElevation
+                    onClick={() => setManageAccountsModalOpen(true)}
+                    startIcon={<AddRoundedIcon sx={{ fontSize: 18 }} />}
+                    sx={{
+                      backgroundColor: '#0B4DB7',
+                      color: '#FFFFFF',
+                      height: '42px',
+                      px: 2.2,
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      whiteSpace: 'nowrap',
+                      borderRadius: '6px',
+                      flexShrink: 0,
+                      boxShadow: 'none',
+                      '&:hover': {
+                        backgroundColor: '#083B8D',
+                      },
+                    }}
+                  >
+                    Manage / Add
+                  </Button>
+                </Box>
+              </Box>
+
+              {/* 6. Notes */}
               <Box
                 sx={{
                   display: 'flex',
@@ -3886,9 +4345,20 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                     input: {
                       sx: {
                         fontSize: '13.5px',
+                        fontWeight: 500,
                         height: '42px',
                         backgroundColor: '#FFFFFF',
                         borderRadius: '6px',
+                        '& .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#CBD5E1',
+                        },
+                        '&:hover .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#94A3B8',
+                        },
+                        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                          borderColor: '#0B4DB7',
+                          borderWidth: '1.5px',
+                        },
                       },
                     },
                   }}
@@ -3930,6 +4400,199 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
           </Paper>
         </Box>
       )}
+
+      {/* Manage / Add Account Names Modal matching Image 9 */}
+      <Dialog
+        open={manageAccountsModalOpen}
+        onClose={() => setManageAccountsModalOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: '16px',
+              p: 3,
+              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            },
+          },
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+          <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
+            Manage / Add Account Names
+          </Typography>
+          <IconButton
+            size="small"
+            onClick={() => setManageAccountsModalOpen(false)}
+            sx={{ color: '#64748B', p: 0.5, mt: -0.5, mr: -0.5 }}
+          >
+            <CloseRoundedIcon sx={{ fontSize: 20 }} />
+          </IconButton>
+        </Box>
+
+        <Typography sx={{ fontSize: '13px', color: '#64748B', mb: 2.5 }}>
+          Add new person / bank account or delete unwanted names from the dropdown list.
+        </Typography>
+
+        {/* Input & Add Button */}
+        <Box sx={{ display: 'flex', gap: 1.2, mb: 3 }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="e.g. S. Nagaraj A/C, Murugan"
+            value={newAccountInput}
+            onChange={(e) => setNewAccountInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddSavedAccount();
+              }
+            }}
+            slotProps={{
+              input: {
+                sx: {
+                  height: '42px',
+                  borderRadius: '8px',
+                  fontSize: '13.5px',
+                  fontWeight: 500,
+                  backgroundColor: '#FFFFFF',
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#CBD5E1',
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#94A3B8',
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#0B4DB7',
+                    borderWidth: '1.5px',
+                  },
+                },
+              },
+            }}
+          />
+          <Button
+            variant="contained"
+            disableElevation
+            disabled={!newAccountInput.trim()}
+            onClick={handleAddSavedAccount}
+            sx={{
+              height: '42px',
+              px: 2.5,
+              borderRadius: '8px',
+              fontSize: '13.5px',
+              fontWeight: 700,
+              textTransform: 'none',
+              backgroundColor: '#0B4DB7',
+              color: '#FFFFFF',
+              '&.Mui-disabled': {
+                backgroundColor: '#E2E8F0',
+                color: '#94A3B8',
+              },
+              '&:hover': {
+                backgroundColor: '#083B8D',
+              },
+            }}
+          >
+            Add
+          </Button>
+        </Box>
+
+        {/* Section Heading */}
+        <Typography
+          sx={{
+            fontSize: '11.5px',
+            fontWeight: 800,
+            color: '#64748B',
+            letterSpacing: '0.04em',
+            mb: 1.5,
+            textTransform: 'uppercase',
+          }}
+        >
+          Saved Account Names ({savedAccounts.length})
+        </Typography>
+
+        {/* Accounts List */}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1.2,
+            maxHeight: '260px',
+            overflowY: 'auto',
+            pr: 0.5,
+            mb: 3,
+          }}
+        >
+          {savedAccounts.length === 0 ? (
+            <Box sx={{ py: 3, textAlign: 'center', color: '#94A3B8', fontSize: '13px' }}>
+              No account names saved yet.
+            </Box>
+          ) : (
+            savedAccounts.map((acc) => (
+              <Box
+                key={acc}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  px: 2,
+                  py: 1.2,
+                  borderRadius: '8px',
+                  border: '1px solid #E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                  transition: 'background-color 0.15s ease',
+                  '&:hover': {
+                    backgroundColor: '#F8FAFC',
+                  },
+                }}
+              >
+                <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: '#1E293B' }}>
+                  {acc}
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={() => handleDeleteSavedAccount(acc)}
+                  sx={{
+                    color: '#EF4444',
+                    p: 0.5,
+                    borderRadius: '6px',
+                    '&:hover': {
+                      backgroundColor: '#FEE2E2',
+                    },
+                  }}
+                  title="Delete account"
+                >
+                  <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Box>
+            ))
+          )}
+        </Box>
+
+        {/* Modal Footer Close Button */}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Button
+            variant="outlined"
+            onClick={() => setManageAccountsModalOpen(false)}
+            sx={{
+              height: '38px',
+              px: 3,
+              borderRadius: '8px',
+              fontSize: '13.5px',
+              fontWeight: 600,
+              textTransform: 'none',
+              borderColor: '#CBD5E1',
+              color: '#334155',
+              '&:hover': {
+                backgroundColor: '#F8FAFC',
+                borderColor: '#94A3B8',
+              },
+            }}
+          >
+            Close
+          </Button>
+        </Box>
+      </Dialog>
       {/* Hidden File Input for PDF Upload (Under 1 MB) */}
       <input
         type="file"
@@ -4311,15 +4974,22 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
 
             <Box>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                Discount (% or ₹)
+                Packing (%)
               </Typography>
               <TextField
                 fullWidth
                 size="small"
-                value={editBillForm.discount}
-                onChange={(e) => setEditBillForm((prev) => ({ ...prev, discount: e.target.value }))}
+                placeholder="e.g. 5"
+                value={editBillForm.packing}
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/[^0-9.]/g, '');
+                  setEditBillForm((prev) => ({ ...prev, packing: cleaned }));
+                }}
                 slotProps={{
-                  input: { sx: { fontSize: '13px', fontWeight: 500, borderRadius: '6px' } },
+                  input: {
+                    endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                    sx: { fontSize: '13px', fontWeight: 500, borderRadius: '6px' },
+                  },
                 }}
               />
             </Box>
@@ -4371,7 +5041,7 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                   <TableCell sx={{ fontSize: '11px', fontWeight: 700 }}>Particular / Item</TableCell>
                   <TableCell sx={{ fontSize: '11px', fontWeight: 700, width: '90px' }}>Qty</TableCell>
                   <TableCell sx={{ fontSize: '11px', fontWeight: 700, width: '90px' }}>Rate (₹)</TableCell>
-                  <TableCell sx={{ fontSize: '11px', fontWeight: 700, width: '90px' }}>Unit</TableCell>
+                  <TableCell sx={{ fontSize: '11px', fontWeight: 700, width: '100px' }}>Unit</TableCell>
                   <TableCell align="right" sx={{ fontSize: '11px', fontWeight: 700, width: '110px' }}>Amount (₹)</TableCell>
                   <TableCell align="center" sx={{ fontSize: '11px', fontWeight: 700, width: '50px' }}>Del</TableCell>
                 </TableRow>
@@ -4425,15 +5095,28 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                       </TableCell>
                       <TableCell>
                         <TextField
+                          select
                           fullWidth
                           size="small"
-                          placeholder="Pkt/Bag"
-                          value={prod.pktUnit}
+                          value={prod.pktUnit || 'nos'}
                           onChange={(e) => handleUpdateEditProductRow(idx, 'pktUnit', e.target.value)}
                           slotProps={{
-                            input: { sx: { fontSize: '12.5px', height: '32px' } },
+                            select: {
+                              sx: { fontSize: '12px', height: '32px' },
+                            },
                           }}
-                        />
+                        >
+                          {!(PKT_UNIT_OPTIONS as readonly string[]).includes(prod.pktUnit) && prod.pktUnit && prod.pktUnit !== '-' && (
+                            <MenuItem value={prod.pktUnit} sx={{ fontSize: '12px' }}>
+                              {prod.pktUnit}
+                            </MenuItem>
+                          )}
+                          {PKT_UNIT_OPTIONS.map((unit) => (
+                            <MenuItem key={unit} value={unit} sx={{ fontSize: '12px' }}>
+                              {unit}
+                            </MenuItem>
+                          ))}
+                        </TextField>
                       </TableCell>
                       <TableCell align="right" sx={{ fontSize: '12.5px', fontWeight: 700, color: '#0F172A' }}>
                         ₹{parseFloat(prod.amount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -4473,10 +5156,10 @@ export const ParticularsPage: FC<ParticularsPageProps> = ({ currentUser, initial
                 <span style={{ color: '#64748B' }}>Subtotal: </span>
                 <strong style={{ color: '#0F172A' }}>₹ {editSubtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
               </div>
-              {editDiscountVal > 0 && (
+              {editPackingVal > 0 && (
                 <div>
-                  <span style={{ color: '#DC2626' }}>Discount: </span>
-                  <strong style={{ color: '#DC2626' }}>- ₹ {editDiscountVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                  <span style={{ color: '#0284C7' }}>Packing ({editBillForm.packing}%): </span>
+                  <strong style={{ color: '#0284C7' }}>+ ₹ {editPackingVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
                 </div>
               )}
               {editTaxVal > 0 && (

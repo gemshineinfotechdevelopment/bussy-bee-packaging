@@ -14,6 +14,10 @@ export interface IParticular extends Document {
   customerAddress?: string;
   customerPhone?: string;
   customerGst?: string;
+  customerState?: string;
+  customerAadhar?: string;
+  customerPan?: string;
+  bundles?: string;
   caseCount: string;
   companyName?: string;
   companyAddress?: string;
@@ -25,6 +29,7 @@ export interface IParticular extends Document {
   traderPhone?: string;
   discount: string;
   transport: string;
+  lrNo?: string;
   packing: string;
   billNo: string;
   tax: string;
@@ -54,6 +59,10 @@ const ParticularSchema: Schema = new Schema(
     customerAddress: { type: String, default: '', trim: true },
     customerPhone: { type: String, default: '', trim: true },
     customerGst: { type: String, default: '', trim: true },
+    customerState: { type: String, default: 'Tamil Nadu', trim: true },
+    customerAadhar: { type: String, default: '', trim: true },
+    customerPan: { type: String, default: '', trim: true },
+    bundles: { type: String, default: '0', trim: true },
     caseCount: { type: String, default: '0' },
     companyName: { type: String, default: '', trim: true },
     companyAddress: { type: String, default: '', trim: true },
@@ -65,6 +74,7 @@ const ParticularSchema: Schema = new Schema(
     traderPhone: { type: String, default: '', trim: true },
     discount: { type: String, default: '' },
     transport: { type: String, default: '' },
+    lrNo: { type: String, default: '', trim: true },
     packing: { type: String, default: '' },
     billNo: { type: String, required: true, trim: true },
     tax: { type: String, default: '' },

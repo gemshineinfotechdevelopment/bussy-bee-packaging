@@ -20,6 +20,7 @@ import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
 import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRounded';
 import TuneRoundedIcon from '@mui/icons-material/TuneRounded';
+import BusinessRoundedIcon from '@mui/icons-material/BusinessRounded';
 import { AuthApi, SettingsApi } from '../services/api';
 
 interface SettingsPageProps {
@@ -40,6 +41,24 @@ export const SettingsPage: FC<SettingsPageProps> = ({ currentUser }) => {
   const [superPassword, setSuperPassword] = useState('');
   const [showSuperPassword, setShowSuperPassword] = useState(false);
   const [superSaving, setSuperSaving] = useState(false);
+
+  // Company Details (Billing & Print Header) state
+  const [companyName, setCompanyName] = useState<string>(
+    () => localStorage.getItem('bussy_bee_company_name') || 'Sri Shanmuga Traders'
+  );
+  const [companyGst, setCompanyGst] = useState<string>(
+    () => localStorage.getItem('bussy_bee_company_gst') || '33BUMPR9147N1ZQ'
+  );
+  const [companyAddress, setCompanyAddress] = useState<string>(
+    () => localStorage.getItem('bussy_bee_company_address') || '352, Amman Kovil Patti Middle Street, Sivakasi - 626123'
+  );
+  const [companyState, setCompanyState] = useState<string>(
+    () => localStorage.getItem('bussy_bee_company_state') || 'Tamil Nadu'
+  );
+  const [companyPhone, setCompanyPhone] = useState<string>(
+    () => localStorage.getItem('bussy_bee_company_phone') || ''
+  );
+  const [companySaving, setCompanySaving] = useState(false);
 
   // Permissions / Settings state
   const [isRateEnabledForAdmin, setIsRateEnabledForAdmin] = useState(true);
@@ -73,8 +92,30 @@ export const SettingsPage: FC<SettingsPageProps> = ({ currentUser }) => {
 
         // Load settings
         const settings = await SettingsApi.getSettings();
-        if (settings && typeof settings.isRateEnabledForAdmin === 'boolean') {
-          setIsRateEnabledForAdmin(settings.isRateEnabledForAdmin);
+        if (settings) {
+          if (typeof settings.isRateEnabledForAdmin === 'boolean') {
+            setIsRateEnabledForAdmin(settings.isRateEnabledForAdmin);
+          }
+          if (settings.companyName) {
+            setCompanyName(settings.companyName);
+            localStorage.setItem('bussy_bee_company_name', settings.companyName);
+          }
+          if (settings.companyGst) {
+            setCompanyGst(settings.companyGst);
+            localStorage.setItem('bussy_bee_company_gst', settings.companyGst);
+          }
+          if (settings.companyAddress) {
+            setCompanyAddress(settings.companyAddress);
+            localStorage.setItem('bussy_bee_company_address', settings.companyAddress);
+          }
+          if (settings.companyState) {
+            setCompanyState(settings.companyState);
+            localStorage.setItem('bussy_bee_company_state', settings.companyState);
+          }
+          if (settings.companyPhone !== undefined) {
+            setCompanyPhone(settings.companyPhone);
+            localStorage.setItem('bussy_bee_company_phone', settings.companyPhone);
+          }
         }
       } catch (err) {
         console.error('Failed to load settings data:', err);
@@ -85,6 +126,57 @@ export const SettingsPage: FC<SettingsPageProps> = ({ currentUser }) => {
 
     fetchData();
   }, []);
+
+  // Handle Save Company Details
+  const handleSaveCompany = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!companyName.trim()) {
+      showToast('Company Name cannot be empty', 'error');
+      return;
+    }
+    if (!companyGst.trim()) {
+      showToast('GSTIN / Tax ID cannot be empty', 'error');
+      return;
+    }
+    if (!companyAddress.trim()) {
+      showToast('Company Address cannot be empty', 'error');
+      return;
+    }
+
+    try {
+      setCompanySaving(true);
+      const cleanName = companyName.trim();
+      const cleanGst = companyGst.trim().toUpperCase();
+      const cleanAddr = companyAddress.trim();
+      const cleanState = companyState.trim() || 'Tamil Nadu';
+      const cleanPhone = companyPhone.trim();
+
+      await SettingsApi.updateSettings({
+        companyName: cleanName,
+        companyGst: cleanGst,
+        companyAddress: cleanAddr,
+        companyState: cleanState,
+        companyPhone: cleanPhone,
+      });
+
+      // Update localStorage cache for instant client availability
+      localStorage.setItem('bussy_bee_company_name', cleanName);
+      localStorage.setItem('bussy_bee_company_gst', cleanGst);
+      localStorage.setItem('bussy_bee_company_address', cleanAddr);
+      localStorage.setItem('bussy_bee_company_state', cleanState);
+      localStorage.setItem('bussy_bee_company_phone', cleanPhone);
+
+      // Notify other active views
+      window.dispatchEvent(new Event('bussy_bee_company_updated'));
+
+      showToast('Company details updated successfully! These details will appear on all bills.');
+    } catch (err: any) {
+      console.error('Error updating company details:', err);
+      showToast(err.message || 'Failed to update company details', 'error');
+    } finally {
+      setCompanySaving(false);
+    }
+  };
 
   // Handle Save Admin Credentials
   const handleSaveAdmin = async (e: FormEvent) => {
@@ -194,6 +286,190 @@ export const SettingsPage: FC<SettingsPageProps> = ({ currentUser }) => {
       </Box>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {/* Card 0: Company Profile & Billing Header */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: { xs: 2.5, sm: 3 },
+            backgroundColor: '#FFFFFF',
+            borderRadius: '12px',
+            border: '1px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+            <Box
+              sx={{
+                width: 38,
+                height: 38,
+                borderRadius: '8px',
+                backgroundColor: '#EFF6FF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#0B4DB7',
+              }}
+            >
+              <BusinessRoundedIcon sx={{ fontSize: 22 }} />
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: '16px', fontWeight: 700, color: '#0F172A' }}>
+                Company Details (Print & Billing Header)
+              </Typography>
+              <Typography sx={{ fontSize: '12px', color: '#64748B' }}>
+                Configure company name, address, and GST number. These details will automatically show on all bills and estimates.
+              </Typography>
+            </Box>
+          </Box>
+
+          <Divider sx={{ mb: 2.5 }} />
+
+          <Box component="form" onSubmit={handleSaveCompany}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                gap: 2.5,
+                mb: 2.5,
+              }}
+            >
+              <Box>
+                <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: '#334155', mb: 0.8 }}>
+                  Company Name <span style={{ color: '#DC2626' }}>*</span>
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="e.g. Sri Shanmuga Traders"
+                  slotProps={{
+                    input: {
+                      sx: {
+                        fontSize: '13.5px',
+                        fontWeight: 600,
+                        height: '40px',
+                        borderRadius: '8px',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+
+              <Box>
+                <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: '#334155', mb: 0.8 }}>
+                  GSTIN / Tax ID <span style={{ color: '#DC2626' }}>*</span>
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={companyGst}
+                  onChange={(e) => setCompanyGst(e.target.value)}
+                  placeholder="e.g. 33BUMPR9147N1ZQ"
+                  slotProps={{
+                    input: {
+                      sx: {
+                        fontSize: '13.5px',
+                        fontWeight: 600,
+                        height: '40px',
+                        borderRadius: '8px',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+
+              <Box sx={{ gridColumn: { xs: '1', sm: '1 / -1' } }}>
+                <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: '#334155', mb: 0.8 }}>
+                  Company Address <span style={{ color: '#DC2626' }}>*</span>
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={companyAddress}
+                  onChange={(e) => setCompanyAddress(e.target.value)}
+                  placeholder="e.g. 352, Amman Kovil Patti Middle Street, Sivakasi - 626123"
+                  slotProps={{
+                    input: {
+                      sx: {
+                        fontSize: '13.5px',
+                        height: '40px',
+                        borderRadius: '8px',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+
+              <Box>
+                <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: '#334155', mb: 0.8 }}>
+                  State Name
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={companyState}
+                  onChange={(e) => setCompanyState(e.target.value)}
+                  placeholder="e.g. Tamil Nadu"
+                  slotProps={{
+                    input: {
+                      sx: {
+                        fontSize: '13.5px',
+                        height: '40px',
+                        borderRadius: '8px',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+
+              <Box>
+                <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: '#334155', mb: 0.8 }}>
+                  Contact Phone / Mobile
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={companyPhone}
+                  onChange={(e) => setCompanyPhone(e.target.value)}
+                  placeholder="e.g. +91 98765 43210"
+                  slotProps={{
+                    input: {
+                      sx: {
+                        fontSize: '13.5px',
+                        height: '40px',
+                        borderRadius: '8px',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button
+                type="submit"
+                variant="contained"
+                disableElevation
+                disabled={companySaving}
+                sx={{
+                  backgroundColor: '#0B4DB7',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  textTransform: 'none',
+                  px: 3,
+                  py: 1,
+                  borderRadius: '7px',
+                  '&:hover': { backgroundColor: '#083B8D' },
+                }}
+              >
+                {companySaving ? 'Saving...' : 'Save Company Details'}
+              </Button>
+            </Box>
+          </Box>
+        </Paper>
+
         {/* Card 1: Admin Credentials */}
         <Paper
           elevation={0}

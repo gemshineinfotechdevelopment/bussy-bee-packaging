@@ -139,6 +139,8 @@ export const AccountsApi = {
     creditAmount: string | number;
     date: string;
     paymentMode?: string;
+    paymentType?: string;
+    transferredTo?: string;
     reference?: string;
     notes?: string;
   }) => request<any>('/accounts/credit', { method: 'POST', body: JSON.stringify(data) }),

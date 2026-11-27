@@ -6,9 +6,12 @@ import {
   InputBase,
   Paper,
   CircularProgress,
+  Autocomplete,
+  TextField,
 } from '@mui/material';
 import AddCircleOutlineRoundedIcon from '@mui/icons-material/AddCircleOutlineRounded';
 import { CustomersApi } from '../services/api';
+import { INDIAN_STATES } from '../constants/appConstants';
 
 interface AddCustomerPageProps {
   onCancel?: () => void;
@@ -22,8 +25,10 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
   const [formData, setFormData] = useState({
     fullName: '',
     mobileNumber: '',
-    gstin: '',
+    aadharNumber: '',
     billingAddress: '',
+    state: '',
+    gstin: '',
   });
   const [loading, setLoading] = useState(false);
 
@@ -37,8 +42,28 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (!formData.fullName.trim() || !formData.billingAddress.trim()) {
-      alert('Please fill in required fields (Full Name and Address)');
+    if (!formData.fullName.trim()) {
+      alert('Please enter Customer Name / Business Name (Mandatory)');
+      return;
+    }
+    if (!formData.mobileNumber.trim()) {
+      alert('Please enter Mobile Number (Mandatory)');
+      return;
+    }
+    if (!formData.aadharNumber.trim()) {
+      alert('Please enter Aadhar Number (Mandatory)');
+      return;
+    }
+    if (!formData.billingAddress.trim()) {
+      alert('Please enter Delivery Address (Mandatory)');
+      return;
+    }
+    if (!formData.state.trim()) {
+      alert('Please select State (Mandatory)');
+      return;
+    }
+    if (!formData.gstin.trim()) {
+      alert('Please enter GSTIN / Tax ID (Mandatory)');
       return;
     }
 
@@ -46,9 +71,11 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
       setLoading(true);
       await CustomersApi.create({
         name: formData.fullName.trim(),
-        mobile: formData.mobileNumber.trim() || 'N/A',
-        gst: formData.gstin.trim() || 'N/A',
+        mobile: formData.mobileNumber.trim(),
+        aadhar: formData.aadharNumber.trim(),
         address: formData.billingAddress.trim(),
+        state: formData.state.trim(),
+        gst: formData.gstin.trim(),
         avatarLetter: formData.fullName.trim().charAt(0).toUpperCase(),
         avatarBg: '#DBEAFE',
         avatarColor: '#0B4DB7',
@@ -122,7 +149,7 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
               gap: 2.5,
             }}
           >
-            {/* Full Name Field */}
+            {/* 1. Full Name Field */}
             <Box>
               <Typography
                 sx={{
@@ -170,7 +197,7 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
               </Box>
             </Box>
 
-            {/* Mobile Number Field */}
+            {/* 2. Mobile Number Field */}
             <Box>
               <Typography
                 sx={{
@@ -181,7 +208,7 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
                   letterSpacing: '-0.01em',
                 }}
               >
-                Mobile Number
+                Mobile Number *
               </Typography>
               <Box
                 sx={{
@@ -218,7 +245,7 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
               </Box>
             </Box>
 
-            {/* GSTIN Field */}
+            {/* 3. Aadhar Number Field */}
             <Box>
               <Typography
                 sx={{
@@ -229,7 +256,7 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
                   letterSpacing: '-0.01em',
                 }}
               >
-                GSTIN / Tax ID
+                Aadhar Number *
               </Typography>
               <Box
                 sx={{
@@ -250,9 +277,9 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
               >
                 <InputBase
                   fullWidth
-                  placeholder="e.g. 29ABCDE1234F1Z5"
-                  value={formData.gstin}
-                  onChange={handleChange('gstin')}
+                  placeholder="e.g. 1234 5678 9012"
+                  value={formData.aadharNumber}
+                  onChange={handleChange('aadharNumber')}
                   sx={{
                     fontSize: '13.5px',
                     fontWeight: 500,
@@ -266,7 +293,7 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
               </Box>
             </Box>
 
-            {/* Billing Address Field */}
+            {/* 4. Delivery Address Field */}
             <Box>
               <Typography
                 sx={{
@@ -298,9 +325,130 @@ export const AddCustomerPage: FC<AddCustomerPageProps> = ({
               >
                 <InputBase
                   fullWidth
-                  placeholder="e.g. 123 Industrial Area, Phase 2"
+                  placeholder="e.g. 123 Industrial Area, Phase 2, Sivakasi"
                   value={formData.billingAddress}
                   onChange={handleChange('billingAddress')}
+                  sx={{
+                    fontSize: '13.5px',
+                    fontWeight: 500,
+                    color: '#0F172A',
+                    '& input::placeholder': {
+                      color: '#94A3B8',
+                      opacity: 1,
+                    },
+                  }}
+                />
+              </Box>
+            </Box>
+
+            {/* 5. State Field (Searchable Autocomplete Text Box) */}
+            <Box>
+              <Typography
+                sx={{
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: '#1E293B',
+                  mb: 1,
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                State *
+              </Typography>
+              <Autocomplete
+                fullWidth
+                size="small"
+                autoHighlight
+                openOnFocus
+                options={INDIAN_STATES}
+                value={formData.state || null}
+                onChange={(_event, newValue) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    state: newValue || '',
+                  }));
+                }}
+                onInputChange={(_event, newInputValue, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setFormData((prev) => ({
+                      ...prev,
+                      state: newInputValue || '',
+                    }));
+                  }
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder="Select or search state..."
+                    sx={{
+                      backgroundColor: '#F8FAFC',
+                      borderRadius: '8px',
+                      '& .MuiOutlinedInput-root': {
+                        height: '42px',
+                        borderRadius: '8px',
+                        fontSize: '13.5px',
+                        fontWeight: 500,
+                        color: '#0F172A',
+                        backgroundColor: '#F8FAFC',
+                        '& fieldset': {
+                          borderColor: '#E2E8F0',
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#CBD5E1',
+                        },
+                        '&.Mui-focused': {
+                          backgroundColor: '#FFFFFF',
+                          boxShadow: '0 0 0 3px rgba(11, 77, 183, 0.1)',
+                          '& fieldset': {
+                            borderColor: '#0B4DB7',
+                            borderWidth: '1.5px',
+                          },
+                        },
+                        '& input::placeholder': {
+                          color: '#94A3B8',
+                          opacity: 1,
+                        },
+                      },
+                    }}
+                  />
+                )}
+              />
+            </Box>
+
+            {/* 6. GSTIN / Tax ID Field */}
+            <Box>
+              <Typography
+                sx={{
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  color: '#1E293B',
+                  mb: 1,
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                GSTIN / Tax ID *
+              </Typography>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  px: 1.5,
+                  height: '42px',
+                  transition: 'all 0.15s ease',
+                  '&:focus-within': {
+                    borderColor: '#0B4DB7',
+                    backgroundColor: '#FFFFFF',
+                    boxShadow: '0 0 0 3px rgba(11, 77, 183, 0.1)',
+                  },
+                }}
+              >
+                <InputBase
+                  fullWidth
+                  placeholder="e.g. 33AAAAA0000A1Z5"
+                  value={formData.gstin}
+                  onChange={handleChange('gstin')}
                   sx={{
                     fontSize: '13.5px',
                     fontWeight: 500,

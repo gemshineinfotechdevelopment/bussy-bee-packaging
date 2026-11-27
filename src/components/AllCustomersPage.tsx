@@ -41,6 +41,7 @@ import { printCustomerListDirectly } from '../utils/printUtils';
 import { shareLedgerOnWhatsApp } from '../utils/whatsappUtils';
 import { DateRangePrintModal } from './DateRangePrintModal';
 import { DatePickerField } from './DatePickerField';
+import { INDIAN_STATES } from '../constants/appConstants';
 
 export interface CustomerFinancial {
   _id?: string;
@@ -53,6 +54,8 @@ export interface CustomerFinancial {
   address: string;
   mobile: string;
   gst: string;
+  aadhar?: string;
+  state?: string;
   totalDebit?: number;
   totalCredit?: number;
   pendingDue?: number;
@@ -85,8 +88,10 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
   const [editFormData, setEditFormData] = useState({
     name: '',
     mobile: '',
+    aadhar: '',
     gst: '',
     address: '',
+    state: 'Tamil Nadu',
   });
   const [editLoading, setEditLoading] = useState(false);
 
@@ -180,8 +185,10 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
     setEditFormData({
       name: customer.name || '',
       mobile: customer.mobile || '',
+      aadhar: customer.aadhar || '',
       gst: customer.gst || '',
       address: customer.address || '',
+      state: customer.state || 'Tamil Nadu',
     });
     setOpenEditModal(true);
   };
@@ -201,8 +208,10 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
       await CustomersApi.update(id, {
         name: editFormData.name.trim(),
         mobile: editFormData.mobile.trim() || 'N/A',
+        aadhar: editFormData.aadhar.trim(),
         gst: editFormData.gst.trim() || 'N/A',
         address: editFormData.address.trim(),
+        state: editFormData.state.trim() || 'Tamil Nadu',
         avatarLetter: editFormData.name.trim().charAt(0).toUpperCase(),
       });
       setOpenEditModal(false);
@@ -442,9 +451,9 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
               display: 'flex',
               alignItems: 'center',
               gap: 1.2,
-              width: { xs: '100%', sm: 'auto' },
               flexWrap: 'wrap',
               flexShrink: 0,
+              width: { xs: '100%', sm: 'auto' },
             }}
           >
             {/* Print All / Filtered Customers Report Button with Date Range Filter */}
@@ -453,13 +462,12 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
               onClick={() => setOpenDatePrintModal(true)}
               startIcon={<PrintOutlinedIcon sx={{ fontSize: 18 }} />}
               sx={{
-                flex: { xs: 1, sm: 'none' },
-                minWidth: 0,
+                flex: { xs: 1, sm: 'initial' },
                 backgroundColor: '#FFFFFF',
                 color: '#0F172A',
                 borderColor: '#CBD5E1',
-                height: '38px',
-                px: { xs: 1.2, sm: 2 },
+                height: '40px',
+                px: { xs: 1.5, sm: 2 },
                 borderRadius: '8px',
                 fontSize: { xs: '12px', sm: '13.5px' },
                 fontWeight: 700,
@@ -484,12 +492,11 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
                 onClick={onAddNewCustomer}
                 startIcon={<AddRoundedIcon sx={{ fontSize: 19 }} />}
                 sx={{
-                  flex: { xs: 1, sm: 'none' },
-                  minWidth: 0,
+                  flex: { xs: 1, sm: 'initial' },
                   backgroundColor: '#0B4DB7',
                   color: '#FFFFFF',
-                  height: '38px',
-                  px: { xs: 1.2, sm: 2.2 },
+                  height: '40px',
+                  px: { xs: 1.5, sm: 2.2 },
                   borderRadius: '8px',
                   fontSize: { xs: '12px', sm: '13.5px' },
                   fontWeight: 700,
@@ -1549,7 +1556,7 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
 
             <Box>
               <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                Mobile Number
+                Mobile Number *
               </Typography>
               <TextField
                 fullWidth
@@ -1564,7 +1571,22 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
 
             <Box>
               <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                GSTIN
+                Aadhar Number *
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                value={editFormData.aadhar}
+                onChange={(e) => setEditFormData({ ...editFormData, aadhar: e.target.value })}
+                slotProps={{
+                  input: { sx: { fontSize: '13.5px', fontWeight: 500, borderRadius: '6px' } },
+                }}
+              />
+            </Box>
+
+            <Box>
+              <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                GSTIN / Tax ID *
               </Typography>
               <TextField
                 fullWidth
@@ -1579,7 +1601,40 @@ export const AllCustomersPage: FC<AllCustomersPageProps> = ({
 
             <Box>
               <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                Address *
+                State *
+              </Typography>
+              <Autocomplete
+                fullWidth
+                size="small"
+                autoHighlight
+                openOnFocus
+                options={INDIAN_STATES}
+                value={editFormData.state || null}
+                onChange={(_e, val) => setEditFormData({ ...editFormData, state: val || '' })}
+                onInputChange={(_e, val, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setEditFormData({ ...editFormData, state: val || '' });
+                  }
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder="Select or search state..."
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        fontSize: '13.5px',
+                        fontWeight: 500,
+                        borderRadius: '6px',
+                      },
+                    }}
+                  />
+                )}
+              />
+            </Box>
+
+            <Box>
+              <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                Delivery Address *
               </Typography>
               <TextField
                 fullWidth

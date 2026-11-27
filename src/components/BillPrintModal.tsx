@@ -29,20 +29,30 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [sharing, setSharing] = useState(false);
-  const [customTrader, setCustomTrader] = useState({
-    traderName: bill?.traderName || bill?.companyName || 'BUSSY BEE',
-    traderAddress: bill?.traderAddress || bill?.companyAddress || '',
-    traderGst: bill?.traderGst || bill?.companyGst || '',
-    traderPhone: bill?.traderPhone || bill?.companyPhone || '',
+  const [customTrader, setCustomTrader] = useState(() => {
+    const savedName = typeof window !== 'undefined' ? localStorage.getItem('bussy_bee_company_name') : null;
+    const savedAddr = typeof window !== 'undefined' ? localStorage.getItem('bussy_bee_company_address') : null;
+    const savedGst = typeof window !== 'undefined' ? localStorage.getItem('bussy_bee_company_gst') : null;
+    const savedPhone = typeof window !== 'undefined' ? localStorage.getItem('bussy_bee_company_phone') : null;
+    return {
+      traderName: bill?.traderName && bill.traderName !== 'BUSSY BEE' ? bill.traderName : (bill?.companyName && bill.companyName !== 'BUSSY BEE' ? bill.companyName : (savedName || 'Sri Shanmuga Traders')),
+      traderAddress: bill?.traderAddress || bill?.companyAddress || savedAddr || '352, Amman Kovil Patti Middle Street, Sivakasi - 626123',
+      traderGst: bill?.traderGst || bill?.companyGst || savedGst || '33BUMPR9147N1ZQ',
+      traderPhone: bill?.traderPhone || bill?.companyPhone || savedPhone || '',
+    };
   });
 
   React.useEffect(() => {
     if (bill) {
+      const savedName = typeof window !== 'undefined' ? localStorage.getItem('bussy_bee_company_name') : null;
+      const savedAddr = typeof window !== 'undefined' ? localStorage.getItem('bussy_bee_company_address') : null;
+      const savedGst = typeof window !== 'undefined' ? localStorage.getItem('bussy_bee_company_gst') : null;
+      const savedPhone = typeof window !== 'undefined' ? localStorage.getItem('bussy_bee_company_phone') : null;
       setCustomTrader({
-        traderName: bill.traderName || bill.companyName || 'BUSSY BEE',
-        traderAddress: bill.traderAddress || bill.companyAddress || '',
-        traderGst: bill.traderGst || bill.companyGst || '',
-        traderPhone: bill.traderPhone || bill.companyPhone || '',
+        traderName: bill.traderName && bill.traderName !== 'BUSSY BEE' ? bill.traderName : (bill.companyName && bill.companyName !== 'BUSSY BEE' ? bill.companyName : (savedName || 'Sri Shanmuga Traders')),
+        traderAddress: bill.traderAddress || bill.companyAddress || savedAddr || '352, Amman Kovil Patti Middle Street, Sivakasi - 626123',
+        traderGst: bill.traderGst || bill.companyGst || savedGst || '33BUMPR9147N1ZQ',
+        traderPhone: bill.traderPhone || bill.companyPhone || savedPhone || '',
       });
     }
   }, [
@@ -201,12 +211,12 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
                 textOverflow: 'ellipsis',
               }}
             >
-              {bill.customerName} {bill.companyName ? `| ${bill.companyName}` : ''}
+              {bill.customerName} | {customTrader.traderName || 'Sri Shanmuga Traders'}
             </Typography>
           </Box>
 
           {/* Desktop quick action buttons (Only on wide screens to prevent overflow on mobile/tablet) */}
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: { xs: 'none', lg: 'flex' }, alignItems: 'center', gap: 1 }}>
             <Button
               variant="contained"
               disableElevation
@@ -256,7 +266,7 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
                 },
               }}
             >
-              Print Invoice
+              Print Estimate
             </Button>
           </Box>
 
@@ -314,8 +324,8 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
               boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
               borderRadius: '4px',
               width: '100%',
-              minWidth: { xs: '720px', sm: 'auto' },
-              maxWidth: '780px',
+              minWidth: '760px',
+              maxWidth: '820px',
               mx: 'auto',
             }}
           >
@@ -425,7 +435,7 @@ export const BillPrintModal: React.FC<BillPrintModalProps> = ({ open, onClose, b
                 },
               }}
             >
-              Print Invoice
+              Print Estimate
             </Button>
           </Box>
         </DialogActions>

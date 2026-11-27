@@ -33,6 +33,7 @@ import { CustomersApi, AccountsApi, CompaniesApi } from '../services/api';
 import { printCustomerListDirectly } from '../utils/printUtils';
 import { DateRangePrintModal } from './DateRangePrintModal';
 import { DatePickerField } from './DatePickerField';
+import { INDIAN_STATES } from '../constants/appConstants';
 
 export interface Customer {
   _id?: string;
@@ -45,6 +46,8 @@ export interface Customer {
   address: string;
   mobile: string;
   gst: string;
+  aadhar?: string;
+  state?: string;
   totalDebit?: number;
   totalCredit?: number;
   pendingDue?: number;
@@ -84,8 +87,10 @@ export const CustomersPage: FC<CustomersPageProps> = ({ currentUser, onAddNew, o
   const [editFormData, setEditFormData] = useState({
     name: '',
     mobile: '',
+    aadhar: '',
     gst: '',
     address: '',
+    state: 'Tamil Nadu',
   });
   const [editLoading, setEditLoading] = useState(false);
 
@@ -135,8 +140,10 @@ export const CustomersPage: FC<CustomersPageProps> = ({ currentUser, onAddNew, o
     setEditFormData({
       name: customer.name || '',
       mobile: customer.mobile || '',
+      aadhar: customer.aadhar || '',
       gst: customer.gst || '',
       address: customer.address || '',
+      state: customer.state || 'Tamil Nadu',
     });
     setOpenEditModal(true);
   };
@@ -156,8 +163,10 @@ export const CustomersPage: FC<CustomersPageProps> = ({ currentUser, onAddNew, o
       await CustomersApi.update(id, {
         name: editFormData.name.trim(),
         mobile: editFormData.mobile.trim() || 'N/A',
+        aadhar: editFormData.aadhar.trim(),
         gst: editFormData.gst.trim() || 'N/A',
         address: editFormData.address.trim(),
+        state: editFormData.state.trim() || 'Tamil Nadu',
         avatarLetter: editFormData.name.trim().charAt(0).toUpperCase(),
       });
       setOpenEditModal(false);
@@ -283,131 +292,160 @@ export const CustomersPage: FC<CustomersPageProps> = ({ currentUser, onAddNew, o
         <Box
           sx={{
             display: 'flex',
-            flexDirection: { xs: 'column', sm: 'row' },
-            alignItems: { xs: 'stretch', sm: 'center' },
-            flexWrap: 'wrap',
-            gap: 1.5,
-            width: { xs: '100%', md: 'auto' },
+            flexDirection: { xs: 'column', md: 'row' },
+            justifyContent: 'space-between',
+            alignItems: { xs: 'stretch', md: 'center' },
+            gap: 2,
+            mb: 3,
           }}
         >
-          {/* Search Box */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              backgroundColor: '#FFFFFF',
-              borderRadius: '8px',
-              border: '1px solid #E2E8F0',
-              px: 1.5,
-              height: '38px',
-              width: { xs: '100%', sm: '240px', md: '260px' },
-              flexShrink: 0,
-              boxSizing: 'border-box',
-              transition: 'border-color 0.2s',
-              '&:hover': {
-                borderColor: '#CBD5E1',
-              },
-              '&:focus-within': {
-                borderColor: '#0B4DB7',
-              },
-            }}
-          >
-            <SearchRoundedIcon
+          <Box>
+            <Typography
+              variant="h1"
               sx={{
-                color: '#8E9AA8',
-                fontSize: 19,
-                mr: 1,
+                fontSize: { xs: '24px', sm: '28px' },
+                fontWeight: 800,
+                color: '#0F172A',
+                letterSpacing: '-0.025em',
+                lineHeight: 1.2,
               }}
-            />
-            <InputBase
-              placeholder="Search customers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{
-                fontSize: '13.5px',
-                fontWeight: 500,
-                color: '#1E293B',
-                width: '100%',
-                '& input': {
-                  p: 0,
-                  '&::placeholder': {
-                    color: '#8E9AA8',
-                    opacity: 1,
-                  },
-                },
-              }}
-            />
+            >
+              Customers
+            </Typography>
+            <Typography sx={{ fontSize: '13px', color: '#64748B', mt: 0.3, fontWeight: 500 }}>
+              {isSuperAdmin
+                ? 'Customer directory with live Debit (Purchases), Credit (Paid/Advance), and Balance'
+                : 'Customer directory and account status'}
+            </Typography>
           </Box>
 
-          {/* Action Buttons Container */}
           <Box
             sx={{
               display: 'flex',
-              alignItems: 'center',
-              gap: 1.2,
-              width: { xs: '100%', sm: 'auto' },
+              flexDirection: { xs: 'column', sm: 'row' },
+              alignItems: { xs: 'stretch', sm: 'center' },
               flexWrap: 'wrap',
-              flexShrink: 0,
+              gap: 1.5,
             }}
           >
-            {/* Print Customers List Button with Date Range Filter */}
-            <Button
-              variant="outlined"
-              onClick={() => setOpenDatePrintModal(true)}
-              startIcon={<PrintOutlinedIcon sx={{ fontSize: 18 }} />}
+            {/* Search Box */}
+            <Box
               sx={{
-                flex: { xs: 1, sm: 'none' },
-                minWidth: 0,
+                display: 'flex',
+                alignItems: 'center',
                 backgroundColor: '#FFFFFF',
-                color: '#0F172A',
-                borderColor: '#CBD5E1',
-                height: '38px',
-                px: { xs: 1.2, sm: 1.8 },
                 borderRadius: '8px',
-                fontSize: { xs: '12px', sm: '13px' },
-                fontWeight: 700,
-                textTransform: 'none',
-                letterSpacing: '-0.01em',
-                whiteSpace: 'nowrap',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+                border: '1px solid #E2E8F0',
+                px: 1.5,
+                height: '40px',
+                width: { xs: '100%', sm: '220px', md: '250px' },
+                flexShrink: 0,
+                boxSizing: 'border-box',
+                transition: 'border-color 0.2s',
                 '&:hover': {
-                  backgroundColor: '#F8FAFC',
-                  borderColor: '#94A3B8',
+                  borderColor: '#CBD5E1',
+                },
+                '&:focus-within': {
+                  borderColor: '#0B4DB7',
                 },
               }}
             >
-              Print List ({filteredCustomers.length})
-            </Button>
-
-            {/* Add New Customer Button */}
-            {onAddNew && (
-              <Button
-                variant="contained"
-                disableElevation
-                onClick={onAddNew}
-                startIcon={<AddRoundedIcon sx={{ fontSize: 19 }} />}
+              <SearchRoundedIcon
                 sx={{
-                  flex: { xs: 1, sm: 'none' },
-                  minWidth: 0,
-                  backgroundColor: '#0B4DB7',
-                  color: '#FFFFFF',
-                  height: '38px',
-                  px: { xs: 1.2, sm: 2 },
+                  color: '#8E9AA8',
+                  fontSize: 19,
+                  mr: 1,
+                  flexShrink: 0,
+                }}
+              />
+              <InputBase
+                placeholder="Search customers..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                sx={{
+                  fontSize: '13.5px',
+                  fontWeight: 500,
+                  color: '#1E293B',
+                  width: '100%',
+                  '& input': {
+                    p: 0,
+                    '&::placeholder': {
+                      color: '#8E9AA8',
+                      opacity: 1,
+                    },
+                  },
+                }}
+              />
+            </Box>
+
+            {/* Action Buttons Container */}
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.2,
+                flexWrap: 'wrap',
+                flexShrink: 0,
+                width: { xs: '100%', sm: 'auto' },
+              }}
+            >
+              {/* Print Customers List Button with Date Range Filter */}
+              <Button
+                variant="outlined"
+                onClick={() => setOpenDatePrintModal(true)}
+                startIcon={<PrintOutlinedIcon sx={{ fontSize: 18 }} />}
+                sx={{
+                  flex: { xs: 1, sm: 'initial' },
+                  backgroundColor: '#FFFFFF',
+                  color: '#0F172A',
+                  borderColor: '#CBD5E1',
+                  height: '40px',
+                  px: { xs: 1.5, sm: 2 },
                   borderRadius: '8px',
-                  fontSize: { xs: '12px', sm: '13.5px' },
+                  fontSize: { xs: '12px', sm: '13px' },
                   fontWeight: 700,
                   textTransform: 'none',
                   letterSpacing: '-0.01em',
                   whiteSpace: 'nowrap',
-                  boxShadow: '0 1px 2px rgba(11, 77, 183, 0.15)',
+                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
                   '&:hover': {
-                    backgroundColor: '#083B8D',
+                    backgroundColor: '#F8FAFC',
+                    borderColor: '#94A3B8',
                   },
                 }}
               >
-                Add Customer
+                Print List ({filteredCustomers.length})
               </Button>
-            )}
+
+              {/* Add New Customer Button */}
+              {onAddNew && (
+                <Button
+                  variant="contained"
+                  disableElevation
+                  onClick={onAddNew}
+                  startIcon={<AddRoundedIcon sx={{ fontSize: 19 }} />}
+                  sx={{
+                    flex: { xs: 1, sm: 'initial' },
+                    backgroundColor: '#0B4DB7',
+                    color: '#FFFFFF',
+                    height: '40px',
+                    px: { xs: 1.5, sm: 2.2 },
+                    borderRadius: '8px',
+                    fontSize: { xs: '12px', sm: '13.5px' },
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    letterSpacing: '-0.01em',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 1px 2px rgba(11, 77, 183, 0.15)',
+                    '&:hover': {
+                      backgroundColor: '#083B8D',
+                    },
+                  }}
+                >
+                  Add Customer
+                </Button>
+              )}
+            </Box>
           </Box>
         </Box>
       </Box>
@@ -1061,7 +1099,7 @@ export const CustomersPage: FC<CustomersPageProps> = ({ currentUser, onAddNew, o
 
             <Box>
               <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                Mobile Number
+                Mobile Number *
               </Typography>
               <TextField
                 fullWidth
@@ -1076,7 +1114,22 @@ export const CustomersPage: FC<CustomersPageProps> = ({ currentUser, onAddNew, o
 
             <Box>
               <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                GSTIN
+                Aadhar Number *
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                value={editFormData.aadhar}
+                onChange={(e) => setEditFormData({ ...editFormData, aadhar: e.target.value })}
+                slotProps={{
+                  input: { sx: { fontSize: '13.5px', fontWeight: 500, borderRadius: '6px' } },
+                }}
+              />
+            </Box>
+
+            <Box>
+              <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                GSTIN / Tax ID *
               </Typography>
               <TextField
                 fullWidth
@@ -1091,7 +1144,40 @@ export const CustomersPage: FC<CustomersPageProps> = ({ currentUser, onAddNew, o
 
             <Box>
               <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
-                Address *
+                State *
+              </Typography>
+              <Autocomplete
+                fullWidth
+                size="small"
+                autoHighlight
+                openOnFocus
+                options={INDIAN_STATES}
+                value={editFormData.state || null}
+                onChange={(_e, val) => setEditFormData({ ...editFormData, state: val || '' })}
+                onInputChange={(_e, val, reason) => {
+                  if (reason === 'input' || reason === 'clear') {
+                    setEditFormData({ ...editFormData, state: val || '' });
+                  }
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder="Select or search state..."
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        fontSize: '13.5px',
+                        fontWeight: 500,
+                        borderRadius: '6px',
+                      },
+                    }}
+                  />
+                )}
+              />
+            </Box>
+
+            <Box>
+              <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#475569', mb: 0.5 }}>
+                Delivery Address *
               </Typography>
               <TextField
                 fullWidth

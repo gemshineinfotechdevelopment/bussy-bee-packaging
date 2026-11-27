@@ -6,7 +6,7 @@ import {
   generateCustomerListPrintHtml,
 } from './printUtils';
 import type { BillPrintData } from '../components/BillPrintTemplate';
-import { numberToWords } from '../components/BillPrintTemplate';
+import { numberToWords, formatStateName } from '../components/BillPrintTemplate';
 
 /**
  * Normalizes phone numbers for WhatsApp (adds 91 if 10-digit Indian number)
@@ -134,34 +134,46 @@ export const shareToWhatsApp = async (options: {
   const cleanFileName = fileName.endsWith('.pdf') ? fileName : `${fileName}.pdf`;
   const cleanPhone = normalizeWhatsAppPhone(phone);
 
+  // 1. If a specific customer phone number is provided, IMMEDIATELY open direct WhatsApp chat to that customer!
+  // Opening immediately avoids modern browser popup blockers which drop window.open after async await delays.
+  if (cleanPhone) {
+    const encodedText = encodeURIComponent(text);
+    const waUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
+    
+    // Open WhatsApp immediately inside the user click context
+    const waWin = window.open(waUrl, '_blank');
+    if (!waWin || waWin.closed || typeof waWin.closed === 'undefined') {
+      // Direct navigation fallback if popup was blocked
+      window.location.href = waUrl;
+    }
+
+    // Generate and download exact PDF copy in the background
+    if (html) {
+      generatePdfBlobFromHtml(html, cleanFileName)
+        .then((pdfFile) => {
+          if (pdfFile) {
+            try {
+              const blobUrl = URL.createObjectURL(pdfFile);
+              const downloadLink = document.createElement('a');
+              downloadLink.href = blobUrl;
+              downloadLink.download = cleanFileName;
+              document.body.appendChild(downloadLink);
+              downloadLink.click();
+              document.body.removeChild(downloadLink);
+              setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+            } catch (dErr) {
+              console.warn('[Direct PDF Download fallback failed]:', dErr);
+            }
+          }
+        })
+        .catch((err) => console.warn('[Background PDF Gen error]:', err));
+    }
+    return;
+  }
+
   let pdfFile: File | null = null;
   if (html) {
     pdfFile = await generatePdfBlobFromHtml(html, cleanFileName);
-  }
-
-  // 1. If a specific customer phone number is provided, ALWAYS open direct WhatsApp chat to that customer!
-  // Web Share API does NOT support targeting recipient phone numbers, so calling navigator.share
-  // forces users to search contacts manually and loses the targeted customer number.
-  if (cleanPhone) {
-    if (pdfFile) {
-      try {
-        const blobUrl = URL.createObjectURL(pdfFile);
-        const downloadLink = document.createElement('a');
-        downloadLink.href = blobUrl;
-        downloadLink.download = cleanFileName;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-      } catch (dErr) {
-        console.warn('[Direct PDF Download fallback failed]:', dErr);
-      }
-    }
-
-    const encodedText = encodeURIComponent(text);
-    const waUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
-    window.open(waUrl, '_blank');
-    return;
   }
 
   // 2. Try Native Web Share API if device/browser supports file sharing and NO phone is targeted
@@ -261,15 +273,19 @@ export const shareBillOnWhatsApp = async (bill: BillPrintData, phone?: string) =
     taxAmt = taxNum;
   }
 
-  // 5. Grand Total calculation
+  // 5. Grand Total calculation with mathematical Round Off (.5 & above rounds up (+1), below .5 rounds down)
   const calculatedTotal = Math.max(0, subtotal - discountAmt + packingAmt + taxAmt);
-  const rawTotalNum = parseFloat(String(bill.total ?? bill.amount ?? '0').replace(/,/g, '')) || 0;
-  const finalTotalNum = rawTotalNum > 0 && Math.abs(rawTotalNum - calculatedTotal) < 0.05 ? rawTotalNum : calculatedTotal;
-  const formattedTotal = finalTotalNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const roundedTotalNum = Math.round(calculatedTotal);
+  const roundOffDiff = roundedTotalNum - calculatedTotal;
+  const formattedTotal = roundedTotalNum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const computedCases = bill.caseCount !== undefined && bill.caseCount !== ''
-    ? bill.caseCount
-    : (bill.products || []).reduce((acc, p) => acc + (parseFloat(String(p.quantity)) || 0), 0);
+  const totalQuantity = (bill.products || []).reduce((acc, p) => {
+    const q = parseFloat(String(p.quantity).replace(/,/g, '')) || 0;
+    return acc + q;
+  }, 0);
+  const primaryUnit = (bill.products && bill.products.length > 0 && bill.products[0].pktUnit && bill.products[0].pktUnit !== '-')
+    ? bill.products[0].pktUnit
+    : 'nos';
 
   const custPhone = targetPhone || bill.customerMobile || bill.customerPhone || bill.phone || '';
   const custAddr = bill.customerAddress && bill.customerAddress.trim() ? bill.customerAddress.trim() : '';
@@ -290,25 +306,26 @@ export const shareBillOnWhatsApp = async (bill: BillPrintData, phone?: string) =
     : '-';
 
   // 7. Full structured message matching BillPrintTemplate layout
-  const text = `*BUSSY BEE - ESTIMATE / INVOICE* 🧾
+  const compHeader = (bill.companyName && bill.companyName !== 'BUSSY BEE' ? bill.companyName : (typeof window !== 'undefined' ? localStorage.getItem('bussy_bee_company_name') : null) || 'SRI SHANMUGA TRADERS').toUpperCase();
+  const text = `*${compHeader} - ESTIMATE* 🧾
 ========================================
 *Bill No:* #${bill.billNo || '-'}
 *Date:* ${bill.date || '-'}
-*Total Counts:* ${computedCases}
-${custPhone ? `*Phone:* ${custPhone}\n` : ''}========================================
+*Total Quantity:* ${totalQuantity} ${primaryUnit}
+${bill.caseCount && bill.caseCount !== '-' ? `*Bundles Qty:* ${bill.caseCount}\n` : ''}${custPhone ? `*Phone:* ${custPhone}\n` : ''}========================================
 *BUYER (BILL TO):*
 *Name:* ${bill.customerName || '-'}
-${custAddr ? `*Address:* ${custAddr}\n` : ''}${custGst && custGst !== '-' ? `*GSTIN / UIN:* ${custGst}\n` : ''}*State Name:* ${bill.customerState || 'Tamil Nadu'}, Code: 33
-${bill.transport && bill.transport !== '-' ? `*Transport:* ${bill.transport}\n` : ''}========================================
+${custAddr ? `*Address:* ${custAddr}\n` : ''}${custGst && custGst !== '-' ? `*GSTIN / UIN:* ${custGst}\n` : ''}*State Name:* ${formatStateName(bill.customerState)}
+${(bill as any).lrNo && (bill as any).lrNo !== '-' ? `*LR No:* ${(bill as any).lrNo}\n` : ''}${bill.transport && bill.transport !== '-' ? `*Transport:* ${bill.transport}\n` : ''}========================================
 *ITEMS:*
 ${itemsText}
 ========================================
 *Subtotal / Particular Amount:* ₹${subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-${discountAmt > 0 ? `*${discountLabel}:* -₹${discountAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` : ''}${packingAmt > 0 ? `*${packingLabel}:* +₹${packingAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` : ''}${taxAmt > 0 ? `*Tax Amount:* +₹${taxAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` : ''}*GRAND TOTAL:* ₹${formattedTotal}
-*Amount in Words:* ${numberToWords(finalTotalNum)}
+${discountAmt > 0 ? `*${discountLabel}:* -₹${discountAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` : ''}${packingAmt > 0 ? `*${packingLabel}:* +₹${packingAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` : ''}${taxAmt > 0 ? `*Tax Amount:* +₹${taxAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` : ''}${Math.abs(roundOffDiff) > 0.001 ? `*Round Off:* ${roundOffDiff >= 0 ? `+₹${roundOffDiff.toFixed(2)}` : `-₹${Math.abs(roundOffDiff).toFixed(2)}`}\n` : ''}*GRAND TOTAL:* ₹${formattedTotal}
+*Amount in Words:* ${numberToWords(roundedTotalNum)}
 ========================================
 _Thank you for your business!_
-*BUSSY BEE*`;
+*${compHeader}*`;
 
   const html = generateBillHtml(bill);
   await shareToWhatsApp({
